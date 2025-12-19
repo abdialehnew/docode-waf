@@ -1,0 +1,57 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  admin_port: 9090
+  read_timeout: 30s
+  write_timeout: 30s
+
+database:
+  driver: "postgres"
+  host: "localhost"
+  port: 5432
+  name: "docode_waf"
+  user: "waf_user"
+  password: "waf_password"
+  sslmode: "disable"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+
+waf:
+  # Rate Limiting
+  rate_limit:
+    enabled: true
+    requests_per_second: 100
+    burst: 200
+    
+  # HTTP Flood Protection
+  http_flood:
+    enabled: true
+    max_requests_per_minute: 1000
+    block_duration: 300 # seconds
+    
+  # Anti-Bot
+  anti_bot:
+    enabled: true
+    challenge_mode: "js" # js, captcha, cookie
+    whitelist_user_agents: []
+    blacklist_user_agents: []
+    
+  # GeoIP
+  geoip:
+    enabled: true
+    database_path: "./geoip/GeoLite2-Country.mmdb"
+    
+ssl:
+  auto_cert: false
+  cert_dir: "./certs"
+  
+logging:
+  level: "info" # debug, info, warn, error
+  format: "json" # json, text
+  output: "stdout" # stdout, file
+  file_path: "./logs/waf.log"

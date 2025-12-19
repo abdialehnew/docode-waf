@@ -1,0 +1,11 @@
+Buatkan Aplikasi Web Application Firewal (WAF) berbasis web menggunakan golang dan nginx atau yang lebih compatible dengan golang dengan fitur sebagai berikut
+- Reserve Proxy
+- Rate Limiting
+- Blocking by IP, Region, URL dan lainnya
+- Management Certificate SSL
+- Http Flood
+- Anti Bot
+- Management Group IP baik single IP maupun 1 blok IP
+- bisa Custom vhost, vhost location
+- Dashboard Monitoring Traffic, Monitoring Serangan
+- UI menggunakan reactJS + Tailwindcss
