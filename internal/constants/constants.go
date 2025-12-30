@@ -8,8 +8,10 @@ const (
 
 // Route constants
 const (
-	RouteVHostID       = "/vhosts/:id"
-	RouteCertificateID = "/certificates/:id"
+	RouteVHostID         = "/vhosts/:id"
+	RouteCertificateID   = "/certificates/:id"
+	RouteBlockingRuleID  = "/blocking-rules/:id"
+	RouteRateLimitRuleID = "/rate-limit-rules/:id"
 )
 
 // SQL query constants
@@ -21,5 +23,7 @@ const (
 
 // Error message constants
 const (
-	ErrVHostNotFound = "VHost not found"
+	ErrVHostNotFound         = "VHost not found"
+	ErrBlockingRuleNotFound  = "Blocking rule not found"
+	ErrRateLimitRuleNotFound = "Rate limit rule not found"
 )

@@ -135,7 +135,8 @@ func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, 
 
 func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, authHandler *api.AuthHandler,
 	dashboardHandler *api.DashboardHandler, vhostHandler *api.VHostHandler,
-	ipGroupHandler *api.IPGroupHandler, certHandler *api.CertificateHandler, settingsHandler *api.SettingsHandler, cfg *config.Config) {
+	ipGroupHandler *api.IPGroupHandler, certHandler *api.CertificateHandler, settingsHandler *api.SettingsHandler,
+	blockingHandler *api.BlockingRuleHandler, rateLimitHandler *api.RateLimitHandler, cfg *config.Config) {
 
 	// Public Auth routes (no authentication required)
 	auth := apiV1.Group("/auth")
@@ -201,6 +202,22 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		protected.DELETE(constants.RouteCertificateID, certHandler.DeleteCertificate)
 		protected.POST("/certificates/update-statuses", certHandler.UpdateCertificateStatuses)
 
+		// Blocking Rules
+		protected.GET("/blocking-rules", blockingHandler.ListBlockingRules)
+		protected.GET(constants.RouteBlockingRuleID, blockingHandler.GetBlockingRule)
+		protected.POST("/blocking-rules", blockingHandler.CreateBlockingRule)
+		protected.PUT(constants.RouteBlockingRuleID, blockingHandler.UpdateBlockingRule)
+		protected.DELETE(constants.RouteBlockingRuleID, blockingHandler.DeleteBlockingRule)
+		protected.PATCH(constants.RouteBlockingRuleID+"/toggle", blockingHandler.ToggleBlockingRule)
+
+		// Rate Limit Rules
+		protected.GET("/rate-limit-rules", rateLimitHandler.ListRateLimitRules)
+		protected.GET(constants.RouteRateLimitRuleID, rateLimitHandler.GetRateLimitRule)
+		protected.POST("/rate-limit-rules", rateLimitHandler.CreateRateLimitRule)
+		protected.PUT(constants.RouteRateLimitRuleID, rateLimitHandler.UpdateRateLimitRule)
+		protected.DELETE(constants.RouteRateLimitRuleID, rateLimitHandler.DeleteRateLimitRule)
+		protected.PATCH(constants.RouteRateLimitRuleID+"/toggle", rateLimitHandler.ToggleRateLimitRule)
+
 		// Settings (POST only, GET is public)
 		protected.POST("/settings/app", settingsHandler.SaveAppSettings)
 	}
@@ -219,6 +236,8 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 	authHandler := api.NewAuthHandler(authService, emailService, cfg)
 	certHandler := api.NewCertificateHandler(certService)
 	settingsHandler := api.NewSettingsHandler(db)
+	blockingHandler := api.NewBlockingRuleHandler(db)
+	rateLimitHandler := api.NewRateLimitHandler(db)
 
 	// Setup admin API
 	adminRouter := gin.Default()
@@ -264,7 +283,7 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 
 	// API routes
 	apiV1 := adminRouter.Group("/api/v1")
-	setupAPIRoutes(apiV1, authService, authHandler, dashboardHandler, vhostHandler, ipGroupHandler, certHandler, settingsHandler, cfg)
+	setupAPIRoutes(apiV1, authService, authHandler, dashboardHandler, vhostHandler, ipGroupHandler, certHandler, settingsHandler, blockingHandler, rateLimitHandler, cfg)
 
 	// Health check
 	adminRouter.GET("/health", func(c *gin.Context) {
