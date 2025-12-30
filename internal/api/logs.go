@@ -260,8 +260,8 @@ func (h *LogsHandler) GetVHostsForLogs(c *gin.Context) {
 		return
 	}
 
-	// Check which vhosts have log files
-	var vhostsWithLogs []map[string]interface{}
+	// Return all enabled vhosts with log file status
+	var vhostsList []map[string]interface{}
 	for _, vhost := range vhosts {
 		accessLogPath := filepath.Join(nginxLogsDir, vhost.Domain, "access.log")
 		errorLogPath := filepath.Join(nginxLogsDir, vhost.Domain, "error.log")
@@ -269,17 +269,15 @@ func (h *LogsHandler) GetVHostsForLogs(c *gin.Context) {
 		hasAccessLog := fileExists(accessLogPath)
 		hasErrorLog := fileExists(errorLogPath)
 
-		if hasAccessLog || hasErrorLog {
-			vhostsWithLogs = append(vhostsWithLogs, map[string]interface{}{
-				"domain":         vhost.Domain,
-				"name":           vhost.Name,
-				"has_access_log": hasAccessLog,
-				"has_error_log":  hasErrorLog,
-			})
-		}
+		vhostsList = append(vhostsList, map[string]interface{}{
+			"domain":         vhost.Domain,
+			"name":           vhost.Name,
+			"has_access_log": hasAccessLog,
+			"has_error_log":  hasErrorLog,
+		})
 	}
 
-	c.JSON(http.StatusOK, vhostsWithLogs)
+	c.JSON(http.StatusOK, vhostsList)
 }
 
 func fileExists(path string) bool {

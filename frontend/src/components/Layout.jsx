@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Shield, LayoutDashboard, Server, Users, Activity, Lock, Settings, LogOut, User, FileText } from 'lucide-react'
+import { Shield, LayoutDashboard, Server, Users, Activity, Lock, Settings, LogOut, User, FileText, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useState, useEffect } from 'react'
 import ConfirmModal from './ConfirmModal'
@@ -9,6 +9,7 @@ const Layout = ({ children }) => {
   const location = useLocation()
   const { user, logout } = useAuth()
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null })
+  const [expandedMenus, setExpandedMenus] = useState({})
   const [appSettings, setAppSettings] = useState({
     app_name: 'Docode WAF',
     app_logo: null
@@ -16,6 +17,10 @@ const Layout = ({ children }) => {
 
   useEffect(() => {
     loadAppSettings()
+    // Auto-expand menu if on monitoring page
+    if (location.pathname.startsWith('/monitoring')) {
+      setExpandedMenus(prev => ({ ...prev, monitoring: true }))
+    }
   }, [])
 
   const loadAppSettings = async () => {
@@ -31,13 +36,26 @@ const Layout = ({ children }) => {
     }
   }
 
+  const toggleMenu = (menuKey) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [menuKey]: !prev[menuKey]
+    }))
+  }
+
   const navigation = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Virtual Hosts', path: '/vhosts', icon: Server },
     { name: 'IP Groups', path: '/ip-groups', icon: Users },
     { name: 'Traffic Logs', path: '/traffic', icon: Activity },
     { name: 'SSL Certificates', path: '/certificates', icon: Lock },
-    { name: 'Monitoring', path: '/monitoring', icon: FileText },
+    { 
+      name: 'Monitoring', 
+      icon: FileText,
+      submenus: [
+        { name: 'Logging', path: '/monitoring' }
+      ]
+    },
     { name: 'Settings', path: '/settings', icon: Settings },
   ]
 
@@ -74,10 +92,55 @@ const Layout = ({ children }) => {
         {/* Navigation - Scrollable */}
         <div className="flex-1 overflow-y-auto px-6">
           <nav className="space-y-2">
-            {navigation.map((item) => {
+            {navigation.map((item, index) => {
               const Icon = item.icon
-              const isActive = location.pathname === item.path
+              const menuKey = item.name.toLowerCase().replace(/\s+/g, '-')
+              const isExpanded = expandedMenus[menuKey]
               
+              // Item with submenus
+              if (item.submenus) {
+                const hasActiveSubmenu = item.submenus.some(sub => location.pathname === sub.path)
+                
+                return (
+                  <div key={index}>
+                    <button
+                      onClick={() => toggleMenu(menuKey)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                        hasActiveSubmenu
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-300 hover:bg-gray-800'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="flex-1 text-left">{item.name}</span>
+                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+                    {isExpanded && (
+                      <div className="ml-8 mt-1 space-y-1">
+                        {item.submenus.map((submenu) => {
+                          const isActive = location.pathname === submenu.path
+                          return (
+                            <Link
+                              key={submenu.path}
+                              to={submenu.path}
+                              className={`block px-4 py-2 rounded-lg text-sm transition-colors ${
+                                isActive
+                                  ? 'bg-primary-600 text-white'
+                                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+                              }`}
+                            >
+                              {submenu.name}
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              
+              // Regular menu item
+              const isActive = location.pathname === item.path
               return (
                 <Link
                   key={item.path}
