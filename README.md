@@ -84,6 +84,23 @@ This project is committed to maintaining high security and code quality standard
 - 🏷️ **Custom Headers** - Add custom HTTP headers per vhost
 - 🗑️ **Auto Cleanup** - Delete log files when vhost is removed
 
+### Monitoring & Logging
+- 📋 **Centralized Logging** - Unified interface for all system logs
+- 🌐 **Nginx Logs Viewer** - Real-time access and error logs per vhost
+  - Access logs with request details, status codes, and response times
+  - Error logs with severity levels and stack traces
+  - Per-vhost filtering with dropdown selector
+  - Live streaming and historical date range selection
+- 🛡️ **WAF Logs Viewer** - Detailed WAF activity and blocked requests
+  - Attack detection logs with pattern matching details
+  - Blocked request logs with reason and source IP
+  - Real-time live monitoring
+  - Historical analysis with date range picker
+- 🔍 **Advanced Filtering** - Filter by vhost, time range, and log type
+- ⏱️ **Live Mode** - Real-time log streaming with auto-refresh
+- 📅 **Date Range Picker** - Analyze historical logs with custom date ranges
+- 📊 **Log Analytics** - Statistics and insights from log data
+
 ### UI/UX
 - ⚡ **Modern React UI** - Built with React 18 + Vite
 - 🎨 **Tailwind CSS** - Beautiful, responsive design
