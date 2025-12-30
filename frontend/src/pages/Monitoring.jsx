@@ -12,6 +12,7 @@ const Monitoring = () => {
   const [wafLogs, setWafLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
+  const [timeRange, setTimeRange] = useState('1D'); // 1D, 7D, or 'custom'
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -25,7 +26,7 @@ const Monitoring = () => {
     if (selectedVhost && activeTab === 'nginx') {
       fetchNginxLogs();
     }
-  }, [selectedVhost, logType]);
+  }, [selectedVhost, logType, timeRange, dateRange]);
 
   useEffect(() => {
     if (activeTab === 'waf') {
@@ -147,40 +148,103 @@ const Monitoring = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Filters */}
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">Virtual Host</label>
-                  {vhosts.length === 0 ? (
-                    <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-500">
-                      No virtual hosts available
-                    </div>
-                  ) : (
+              <div className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2">Virtual Host</label>
+                    {vhosts.length === 0 ? (
+                      <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-500">
+                        No virtual hosts available
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedVhost}
+                        onChange={(e) => setSelectedVhost(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        {vhosts.map((vhost) => (
+                          <option key={vhost.domain} value={vhost.domain}>
+                            {vhost.name} ({vhost.domain})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2">Log Type</label>
                     <select
-                      value={selectedVhost}
-                      onChange={(e) => setSelectedVhost(e.target.value)}
+                      value={logType}
+                      onChange={(e) => setLogType(e.target.value)}
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      disabled={vhosts.length === 0}
                     >
-                      {vhosts.map((vhost) => (
-                        <option key={vhost.domain} value={vhost.domain}>
-                          {vhost.name} ({vhost.domain})
-                        </option>
-                      ))}
+                      <option value="access">Access Logs</option>
+                      <option value="error">Error Logs</option>
                     </select>
-                  )}
+                  </div>
                 </div>
 
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">Log Type</label>
-                  <select
-                    value={logType}
-                    onChange={(e) => setLogType(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    disabled={vhosts.length === 0}
-                  >
-                    <option value="access">Access Logs</option>
-                    <option value="error">Error Logs</option>
-                  </select>
+                {/* Time Range Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Time Range</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setTimeRange('1D')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        timeRange === '1D'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      1 Day
+                    </button>
+                    <button
+                      onClick={() => setTimeRange('7D')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        timeRange === '7D'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      7 Days
+                    </button>
+                    <button
+                      onClick={() => setTimeRange('custom')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        timeRange === 'custom'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Date Range
+                    </button>
+                  </div>
                 </div>
+
+                {/* Custom Date Range */}
+                {timeRange === 'custom' && (
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium mb-2">Start Date</label>
+                      <input
+                        type="date"
+                        value={dateRange.start}
+                        onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium mb-2">End Date</label>
+                      <input
+                        type="date"
+                        value={dateRange.end}
+                        onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Logs Display */}

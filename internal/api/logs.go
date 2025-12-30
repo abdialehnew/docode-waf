@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	nginxLogsDir      = "/app/nginx/logs"
+	nginxLogsDir      = "/data/nginx/logs"
 	errDomainRequired = "domain parameter is required"
 	defaultLogLines   = "100"
 	defaultLiveMode   = "false"
@@ -41,7 +41,8 @@ func (h *LogsHandler) GetNginxAccessLogs(c *gin.Context) {
 		return
 	}
 
-	logPath := filepath.Join(nginxLogsDir, domain, "access.log")
+	// Log file format: {domain}_access.log
+	logPath := filepath.Join(nginxLogsDir, domain+"_access.log")
 	logs, err := readLogFile(logPath, lines)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -71,7 +72,8 @@ func (h *LogsHandler) GetNginxErrorLogs(c *gin.Context) {
 		return
 	}
 
-	logPath := filepath.Join(nginxLogsDir, domain, "error.log")
+	// Log file format: {domain}_error.log
+	logPath := filepath.Join(nginxLogsDir, domain+"_error.log")
 	logs, err := readLogFile(logPath, lines)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -159,8 +161,8 @@ func (h *LogsHandler) StreamNginxLogs(c *gin.Context) {
 		return
 	}
 
-	filename := logType + ".log"
-	logPath := filepath.Join(nginxLogsDir, domain, filename)
+	// Log file format: {domain}_{type}.log
+	logPath := filepath.Join(nginxLogsDir, domain+"_"+logType+".log")
 
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
@@ -263,8 +265,9 @@ func (h *LogsHandler) GetVHostsForLogs(c *gin.Context) {
 	// Return all enabled vhosts with log file status
 	var vhostsList []map[string]interface{}
 	for _, vhost := range vhosts {
-		accessLogPath := filepath.Join(nginxLogsDir, vhost.Domain, "access.log")
-		errorLogPath := filepath.Join(nginxLogsDir, vhost.Domain, "error.log")
+		// Log file format: {domain}_access.log and {domain}_error.log
+		accessLogPath := filepath.Join(nginxLogsDir, vhost.Domain+"_access.log")
+		errorLogPath := filepath.Join(nginxLogsDir, vhost.Domain+"_error.log")
 
 		hasAccessLog := fileExists(accessLogPath)
 		hasErrorLog := fileExists(errorLogPath)
