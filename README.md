@@ -86,7 +86,7 @@ This project is committed to maintaining high security and code quality standard
 ## 📋 Architecture
 
 ```
-dcode-waf/
+docode-waf/
 ├── cmd/
 │   └── waf/
 │       └── main.go              # Application entry point
