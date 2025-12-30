@@ -7,6 +7,21 @@
 
 A powerful and modern Web Application Firewall (WAF) built with **Golang** and **React** with real-time monitoring, SSL management, and advanced security features.
 
+## 🏠 Self-Hosted Solution
+
+DCode WAF is a **fully self-hosted** security solution that gives you complete control:
+
+- 💾 **Full Data Ownership** - All traffic logs, configurations, and sensitive data stay on your infrastructure
+- 🔒 **Privacy First** - No external dependencies or cloud services required for core functionality
+- 🐳 **Docker-Based Deployment** - Easy setup with Docker Compose for quick deployment
+- 🔧 **Customizable** - Modify and extend the codebase to fit your specific needs
+- 💰 **Cost-Effective** - No licensing fees or per-request charges
+- 🌐 **Offline Capable** - Works completely offline (except optional GeoIP updates)
+- 📦 **All-in-One Package** - WAF engine, admin panel, and database included
+- 🔓 **Open Source** - MIT licensed for both personal and commercial use
+
+Perfect for organizations that require data sovereignty, compliance with data residency regulations, or simply prefer to keep their security infrastructure in-house.
+
 ## ☕ Support This Project
 
 If you find this project helpful, consider supporting me:
