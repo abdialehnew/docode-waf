@@ -52,12 +52,14 @@ const Monitoring = () => {
   const fetchVhosts = async () => {
     try {
       const response = await api.get('/logs/vhosts');
-      setVhosts(response.data);
-      if (response.data.length > 0) {
-        setSelectedVhost(response.data[0].domain);
+      const data = response.data || [];
+      setVhosts(data);
+      if (Array.isArray(data) && data.length > 0) {
+        setSelectedVhost(data[0].domain);
       }
     } catch (error) {
       console.error('Failed to fetch vhosts:', error);
+      setVhosts([]);
     }
   };
 
@@ -70,9 +72,10 @@ const Monitoring = () => {
       const response = await api.get(endpoint, {
         params: { domain: selectedVhost, lines: 100 }
       });
-      setNginxLogs(response.data.lines || []);
+      setNginxLogs(response.data?.lines || []);
     } catch (error) {
       console.error('Failed to fetch nginx logs:', error);
+      setNginxLogs([]);
     } finally {
       setLoading(false);
     }
@@ -88,9 +91,10 @@ const Monitoring = () => {
           limit: 100
         }
       });
-      setWafLogs(response.data.logs || []);
+      setWafLogs(response.data?.logs || []);
     } catch (error) {
       console.error('Failed to fetch WAF logs:', error);
+      setWafLogs([]);
     } finally {
       setLoading(false);
     }
@@ -146,17 +150,23 @@ const Monitoring = () => {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium mb-2">Virtual Host</label>
-                  <select
-                    value={selectedVhost}
-                    onChange={(e) => setSelectedVhost(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    {vhosts.map((vhost) => (
-                      <option key={vhost.domain} value={vhost.domain}>
-                        {vhost.name} ({vhost.domain})
-                      </option>
-                    ))}
-                  </select>
+                  {vhosts.length === 0 ? (
+                    <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-500">
+                      No virtual hosts available
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedVhost}
+                      onChange={(e) => setSelectedVhost(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      {vhosts.map((vhost) => (
+                        <option key={vhost.domain} value={vhost.domain}>
+                          {vhost.name} ({vhost.domain})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="flex-1">
@@ -165,6 +175,7 @@ const Monitoring = () => {
                     value={logType}
                     onChange={(e) => setLogType(e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    disabled={vhosts.length === 0}
                   >
                     <option value="access">Access Logs</option>
                     <option value="error">Error Logs</option>
