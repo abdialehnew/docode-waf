@@ -9,19 +9,26 @@ services:
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      PGDATA: /var/lib/postgresql/data
     ports:
       - "${DATABASE_PORT}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./data/postgresql/pgdata:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/001_init.sql
+      - ./migrations/002_add_vhost_advanced_fields.sql:/docker-entrypoint-initdb.d/002_add_vhost_advanced_fields.sql
+      - ./migrations/003_add_app_settings.sql:/docker-entrypoint-initdb.d/003_add_app_settings.sql
+      - ./migrations/004_add_attack_detection_to_traffic_logs.sql:/docker-entrypoint-initdb.d/004_add_attack_detection_to_traffic_logs.sql
+      - ./migrations/005_seed_default_admin.sql:/docker-entrypoint-initdb.d/005_seed_default_admin.sql
     networks:
       - waf-network
 
   redis:
-    image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
     ports:
       - "${REDIS_PORT}:6379"
+    volumes:
+      - ./data/redis:/data
     networks:
       - waf-network
 
@@ -38,6 +45,14 @@ services:
     environment:
       - DATABASE_HOST=postgres
       - REDIS_HOST=redis
+      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
+      - CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-*}
+    volumes:
+      - ./data/nginx/ssl:/app/ssl/certificates
+      - ./data/nginx/config:/app/nginx/conf.d
+      - ./data/nginx:/data/nginx  # Mount for reload signal
+      - ./data/waf:/app/data
     networks:
       - waf-network
     restart: unless-stopped
@@ -53,8 +68,25 @@ services:
     networks:
       - waf-network
 
-volumes:
-  postgres_data:
+  # Nginx Reverse Proxy for VHosts
+  nginx-proxy:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data/nginx:/data/nginx  # Mount entire nginx data directory
+      - ./data/nginx/logs:/var/log/nginx
+      - ./data/nginx/ssl:/etc/nginx/ssl/certificates:ro
+      - ./data/nginx/config:/etc/nginx/conf.d
+      - ./data/nginx/vhost:/etc/nginx/vhost.d
+    depends_on:
+      - waf
+    networks:
+      - waf-network
+    restart: unless-stopped
 
 networks:
   waf-network:

@@ -10,20 +10,22 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Redis    RedisConfig    `yaml:"redis"`
-	WAF      WAFConfig      `yaml:"waf"`
-	SSL      SSLConfig      `yaml:"ssl"`
-	Logging  LoggingConfig  `yaml:"logging"`
+	Server    ServerConfig    `yaml:"server"`
+	Database  DatabaseConfig  `yaml:"database"`
+	Redis     RedisConfig     `yaml:"redis"`
+	WAF       WAFConfig       `yaml:"waf"`
+	SSL       SSLConfig       `yaml:"ssl"`
+	Logging   LoggingConfig   `yaml:"logging"`
+	Turnstile TurnstileConfig `yaml:"turnstile"`
 }
 
 type ServerConfig struct {
-	Host         string        `yaml:"host"`
-	Port         int           `yaml:"port"`
-	AdminPort    int           `yaml:"admin_port"`
-	ReadTimeout  time.Duration `yaml:"read_timeout"`
-	WriteTimeout time.Duration `yaml:"write_timeout"`
+	Host            string        `yaml:"host"`
+	Port            int           `yaml:"port"`
+	AdminPort       int           `yaml:"admin_port"`
+	ReadTimeout     time.Duration `yaml:"read_timeout"`
+	WriteTimeout    time.Duration `yaml:"write_timeout"`
+	CORSAllowOrigin string        `yaml:"cors_allow_origin"`
 }
 
 type DatabaseConfig struct {
@@ -87,6 +89,11 @@ type LoggingConfig struct {
 	FilePath string `yaml:"file_path"`
 }
 
+type TurnstileConfig struct {
+	SiteKey   string `yaml:"site_key"`
+	SecretKey string `yaml:"secret_key"`
+}
+
 func LoadConfig(path string) (*Config, error) {
 	var cfg Config
 
@@ -130,6 +137,9 @@ func (c *Config) overrideFromEnv() {
 		if duration, err := time.ParseDuration(val); err == nil {
 			c.Server.WriteTimeout = duration
 		}
+	}
+	if val := os.Getenv("CORS_ALLOW_ORIGIN"); val != "" {
+		c.Server.CORSAllowOrigin = val
 	}
 
 	// Database
@@ -247,6 +257,14 @@ func (c *Config) overrideFromEnv() {
 	if val := os.Getenv("LOG_FILE_PATH"); val != "" {
 		c.Logging.FilePath = val
 	}
+
+	// Turnstile
+	if val := os.Getenv("TURNSTILE_SITE_KEY"); val != "" {
+		c.Turnstile.SiteKey = val
+	}
+	if val := os.Getenv("TURNSTILE_SECRET_KEY"); val != "" {
+		c.Turnstile.SecretKey = val
+	}
 }
 
 func (c *Config) GetDSN() string {
@@ -270,4 +288,69 @@ func (c *Config) GetServerAddr() string {
 
 func (c *Config) GetAdminAddr() string {
 	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.AdminPort)
+}
+
+func (c *Config) GetCORSAllowedOrigins() []string {
+	if c.Server.CORSAllowOrigin == "" {
+		return []string{"*"}
+	}
+
+	// Split by comma for multiple origins
+	origins := []string{}
+	for _, origin := range splitAndTrim(c.Server.CORSAllowOrigin, ",") {
+		if origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+
+	if len(origins) == 0 {
+		return []string{"*"}
+	}
+
+	return origins
+}
+
+func splitAndTrim(s, sep string) []string {
+	var result []string
+	for _, part := range splitString(s, sep) {
+		trimmed := trimString(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+func splitString(s, sep string) []string {
+	if s == "" {
+		return []string{}
+	}
+	result := []string{}
+	current := ""
+	for i := 0; i < len(s); i++ {
+		if i+len(sep) <= len(s) && s[i:i+len(sep)] == sep {
+			result = append(result, current)
+			current = ""
+			i += len(sep) - 1
+		} else {
+			current += string(s[i])
+		}
+	}
+	result = append(result, current)
+	return result
+}
+
+func trimString(s string) string {
+	start := 0
+	end := len(s)
+
+	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
+		start++
+	}
+
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+
+	return s[start:end]
 }

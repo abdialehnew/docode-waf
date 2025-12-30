@@ -1,10 +1,77 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
-type BotDetector struct {
-}	})		next.ServeHTTP(w, r)		}			return			http.Error(w, "Bot detected", http.StatusForbidden)			// Return a challenge or block			r = r.WithContext(ctx)			ctx = context.WithValue(ctx, "bot_user_agent", r.UserAgent())			ctx = context.WithValue(ctx, "block_reason", "bot_detected")			ctx := context.WithValue(r.Context(), "blocked", true)		if bd.IsSuspicious(r) {	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {func (bd *BotDetector) Middleware(next http.Handler) http.Handler {}	return false	}		return true	if referer != "" && !strings.HasPrefix(referer, "http") {	referer := r.Header.Get("Referer")	// Check for suspicious header combinations	}		return true	if r.Header.Get("Accept-Language") == "" && bd.strictMode {	}		return true	if r.Header.Get("Accept") == "" {	// Check for missing common headers	}		return true	if bd.IsBot(userAgent) {	// Check user agent	userAgent := r.UserAgent()func (bd *BotDetector) IsSuspicious(r *http.Request) bool {}	return false	}		}			return true		if re.MatchString(userAgent) {	for _, re := range bd.suspiciousBots {	// Check for suspicious patterns	}		}			return false		if re.MatchString(userAgent) {	for _, re := range bd.whitelistedBots {	// Check if it's a whitelisted bot	}		return true // Empty user agent is suspicious	if userAgent == "" {func (bd *BotDetector) IsBot(userAgent string) bool {}	return regexps	}		}			regexps = append(regexps, re)		if err == nil {		re, err := regexp.Compile(pattern)	for _, pattern := range patterns {	regexps := make([]*regexp.Regexp, 0, len(patterns))func compileRegexps(patterns []string) []*regexp.Regexp {}	return bd	}		strictMode:      strictMode,		whitelistedBots: compileRegexps(knownBots),		suspiciousBots:  compileRegexps(suspiciousBots),		knownBots:       compileRegexps(knownBots),	bd := &BotDetector{	}		`(?i)headless`,		`(?i)selenium`,		`(?i)phantom`,		`(?i)scan`,		`(?i)http`,		`(?i)java`,		`(?i)python`,		`(?i)wget`,		`(?i)curl`,		`(?i)scraper`,		`(?i)spider`,		`(?i)crawler`,		`(?i)bot`,	suspiciousBots := []string{	// Suspicious patterns	}		`(?i)linkedinbot`,		`(?i)twitterbot`,		`(?i)facebookexternalhit`,		`(?i)yandexbot`,		`(?i)baiduspider`,		`(?i)duckduckbot`,		`(?i)slurp`, // Yahoo		`(?i)bingbot`,		`(?i)googlebot`,	knownBots := []string{	// Known legitimate botsfunc NewBotDetector(strictMode bool) *BotDetector {}	strictMode      bool	whitelistedBots []*regexp.Regexp	suspiciousBots  []*regexp.Regexp	knownBots       []*regexp.Regexp
+
+var badBotPatterns = []string{
+	"(?i)(bot|crawler|spider|scraper)",
+	"(?i)(wget|curl|python-requests)",
+	"(?i)(semrush|ahrefs|majestic)",
+}
+
+// BotDetectorMiddleware detects and blocks known bad bots
+func BotDetectorMiddleware() gin.HandlerFunc {
+	compiledPatterns := make([]*regexp.Regexp, 0, len(badBotPatterns))
+	for _, pattern := range badBotPatterns {
+		re, err := regexp.Compile(pattern)
+		if err == nil {
+			compiledPatterns = append(compiledPatterns, re)
+		}
+	}
+
+	return func(c *gin.Context) {
+		userAgent := c.GetHeader("User-Agent")
+
+		// Empty user agent is suspicious
+		if userAgent == "" {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Missing User-Agent",
+			})
+			c.Abort()
+			return
+		}
+
+		// Check against bad bot patterns
+		for _, pattern := range compiledPatterns {
+			if pattern.MatchString(userAgent) {
+				// Check if it's a legitimate bot (Google, Bing, etc.)
+				if !isLegitimateBot(userAgent) {
+					c.JSON(http.StatusForbidden, gin.H{
+						"error": "Bot access denied",
+					})
+					c.Abort()
+					return
+				}
+			}
+		}
+
+		c.Next()
+	}
+}
+
+func isLegitimateBot(userAgent string) bool {
+	legitimateBots := []string{
+		"Googlebot",
+		"Bingbot",
+		"Slurp", // Yahoo
+		"DuckDuckBot",
+		"Baiduspider",
+		"YandexBot",
+		"facebookexternalhit",
+		"LinkedInBot",
+		"Twitterbot",
+	}
+
+	userAgentLower := strings.ToLower(userAgent)
+	for _, bot := range legitimateBots {
+		if strings.Contains(userAgentLower, strings.ToLower(bot)) {
+			return true
+		}
+	}
+	return false
+}

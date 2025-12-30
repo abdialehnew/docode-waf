@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getIPGroups, createIPGroup, deleteIPGroup, addIPToGroup, getGroupIPs, removeIPFromGroup } from '../services/api'
 import { Plus, Trash2, Shield } from 'lucide-react'
+import ConfirmModal from '../components/ConfirmModal'
 
 const IPGroups = () => {
   const [groups, setGroups] = useState([])
@@ -9,6 +10,8 @@ const IPGroups = () => {
   const [showIPModal, setShowIPModal] = useState(false)
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [groupIPs, setGroupIPs] = useState([])
+  const [loadingIPs, setLoadingIPs] = useState(false)
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null, title: '', message: '' })
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -27,9 +30,10 @@ const IPGroups = () => {
   const loadGroups = async () => {
     try {
       const response = await getIPGroups()
-      setGroups(response.data)
+      setGroups(response.data || [])
     } catch (error) {
       console.error('Failed to load IP groups:', error)
+      setGroups([])
     } finally {
       setLoading(false)
     }
@@ -47,24 +51,34 @@ const IPGroups = () => {
     }
   }
 
-  const handleDeleteGroup = async (id) => {
-    if (!confirm('Are you sure you want to delete this IP group?')) return
-    
-    try {
-      await deleteIPGroup(id)
-      loadGroups()
-    } catch (error) {
-      console.error('Failed to delete group:', error)
-    }
+  const handleDeleteGroup = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete IP Group',
+      message: 'Are you sure you want to delete this IP group? This action cannot be undone.',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteIPGroup(id)
+          loadGroups()
+        } catch (error) {
+          console.error('Failed to delete group:', error)
+        }
+      }
+    })
   }
 
   const handleViewIPs = async (group) => {
     setSelectedGroup(group)
+    setLoadingIPs(true)
     try {
       const response = await getGroupIPs(group.id)
-      setGroupIPs(response.data)
+      setGroupIPs(response.data || [])
     } catch (error) {
       console.error('Failed to load IPs:', error)
+      setGroupIPs([])
+    } finally {
+      setLoadingIPs(false)
     }
   }
 
@@ -107,7 +121,7 @@ const IPGroups = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {groups.map((group) => (
+        {(groups || []).map((group) => (
           <div key={group.id} className="card">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -158,8 +172,9 @@ const IPGroups = () => {
             <h2 className="text-2xl font-bold mb-4">Add IP Group</h2>
             <form onSubmit={handleCreateGroup} className="space-y-4">
               <div>
-                <label className="label">Name</label>
+                <label htmlFor="group-name" className="label">Name</label>
                 <input
+                  id="group-name"
                   type="text"
                   className="input"
                   value={formData.name}
@@ -169,8 +184,9 @@ const IPGroups = () => {
               </div>
 
               <div>
-                <label className="label">Description</label>
+                <label htmlFor="group-description" className="label">Description</label>
                 <textarea
+                  id="group-description"
                   className="input"
                   rows="3"
                   value={formData.description}
@@ -179,8 +195,9 @@ const IPGroups = () => {
               </div>
 
               <div>
-                <label className="label">Type</label>
+                <label htmlFor="group-type" className="label">Type</label>
                 <select
+                  id="group-type"
                   className="input"
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -223,7 +240,12 @@ const IPGroups = () => {
             </div>
 
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {groupIPs.map((ip) => (
+              {loadingIPs ? (
+                <div className="text-center py-4 text-gray-500">Loading IPs...</div>
+              ) : (groupIPs || []).length === 0 ? (
+                <div className="text-center py-4 text-gray-500">No IPs added yet</div>
+              ) : (
+                (groupIPs || []).map((ip) => (
                 <div key={ip.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                   <div>
                     <p className="font-mono">
@@ -240,7 +262,7 @@ const IPGroups = () => {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-              ))}
+              )))}
             </div>
 
             <button
@@ -260,8 +282,9 @@ const IPGroups = () => {
             <h2 className="text-2xl font-bold mb-4">Add IP Address</h2>
             <form onSubmit={handleAddIP} className="space-y-4">
               <div>
-                <label className="label">IP Address</label>
+                <label htmlFor="ip-address" className="label">IP Address</label>
                 <input
+                  id="ip-address"
                   type="text"
                   className="input"
                   placeholder="192.168.1.1"
@@ -272,8 +295,9 @@ const IPGroups = () => {
               </div>
 
               <div>
-                <label className="label">CIDR Mask (optional)</label>
+                <label htmlFor="cidr-mask" className="label">CIDR Mask (optional)</label>
                 <input
+                  id="cidr-mask"
                   type="number"
                   className="input"
                   placeholder="24"
@@ -282,15 +306,16 @@ const IPGroups = () => {
                   value={ipFormData.cidr_mask || ''}
                   onChange={(e) => setIPFormData({ 
                     ...ipFormData, 
-                    cidr_mask: e.target.value ? parseInt(e.target.value) : null 
+                    cidr_mask: e.target.value ? Number.parseInt(e.target.value, 10) : null 
                   })}
                 />
                 <p className="text-sm text-gray-600 mt-1">For IP blocks (e.g., /24 for 192.168.1.0/24)</p>
               </div>
 
               <div>
-                <label className="label">Description</label>
+                <label htmlFor="ip-description" className="label">Description</label>
                 <input
+                  id="ip-description"
                   type="text"
                   className="input"
                   value={ipFormData.description}
@@ -314,6 +339,16 @@ const IPGroups = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

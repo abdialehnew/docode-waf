@@ -12,16 +12,18 @@ import (
 
 	"github.com/aleh/docode-waf/internal/config"
 	"github.com/aleh/docode-waf/internal/models"
+	"github.com/aleh/docode-waf/internal/services"
 )
 
 type ReverseProxy struct {
-	config    *config.Config
-	vhosts    map[string]*models.VHost
-	proxies   map[string]*httputil.ReverseProxy
-	transport *http.Transport
+	config       *config.Config
+	vhosts       map[string]*models.VHost
+	proxies      map[string]*httputil.ReverseProxy
+	transport    *http.Transport
+	vhostService *services.VHostService
 }
 
-func NewReverseProxy(cfg *config.Config) *ReverseProxy {
+func NewReverseProxy(cfg *config.Config, vhostService *services.VHostService) *ReverseProxy {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -39,10 +41,11 @@ func NewReverseProxy(cfg *config.Config) *ReverseProxy {
 	}
 
 	return &ReverseProxy{
-		config:    cfg,
-		vhosts:    make(map[string]*models.VHost),
-		proxies:   make(map[string]*httputil.ReverseProxy),
-		transport: transport,
+		config:       cfg,
+		vhosts:       make(map[string]*models.VHost),
+		proxies:      make(map[string]*httputil.ReverseProxy),
+		transport:    transport,
+		vhostService: vhostService,
 	}
 }
 

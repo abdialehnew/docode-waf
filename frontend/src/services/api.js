@@ -5,12 +5,45 @@ const api = axios.create({
   timeout: 10000,
 })
 
+// Add token to requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Handle 401 errors (token expired/invalid)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      if (globalThis.location.pathname !== '/login') {
+        globalThis.location.href = '/login'
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 // Dashboard APIs
-export const getDashboardStats = (range = '24h') => 
-  api.get('/dashboard/stats', { params: { range } })
+export const getDashboardStats = (params = {}) => {
+  // Support both old range format and new custom date format
+  if (typeof params === 'string') {
+    // Legacy support: range as string
+    return api.get('/dashboard/stats', { params: { range: params } })
+  }
+  // New format: object with start and end dates
+  return api.get('/dashboard/stats', { params })
+}
 
 export const getTrafficLogs = (limit = 100, offset = 0) =>
   api.get('/dashboard/traffic', { params: { limit, offset } })
+
+export const getAttacksByCountry = (params = {}) =>
+  api.get('/dashboard/attacks-by-country', { params })
 
 // VHost APIs
 export const getVHosts = () => api.get('/vhosts')
@@ -27,5 +60,9 @@ export const deleteIPGroup = (id) => api.delete(`/ip-groups/${id}`)
 export const addIPToGroup = (groupId, data) => api.post(`/ip-groups/${groupId}/ips`, data)
 export const getGroupIPs = (groupId) => api.get(`/ip-groups/${groupId}/ips`)
 export const removeIPFromGroup = (groupId, ipId) => api.delete(`/ip-groups/${groupId}/ips/${ipId}`)
+
+// Settings APIs (public endpoint for login page)
+export const getAppSettings = () => api.get('/settings/app')
+export const getTurnstileSiteKey = () => api.get('/turnstile/sitekey')
 
 export default api

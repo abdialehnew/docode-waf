@@ -45,6 +45,10 @@ config.local.yaml
 *.log
 logs/
 
+# Documentation (except README.md)
+*.md
+!README.md
+
 # Frontend build
 frontend/build/
 frontend/dist/
@@ -53,3 +57,6 @@ frontend/.next/
 # Environment files
 .env
 .env.local
+
+# Data directories - exclude all data files
+data/

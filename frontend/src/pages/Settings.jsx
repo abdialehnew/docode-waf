@@ -1,11 +1,310 @@
-import { Settings as SettingsIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Settings as SettingsIcon, Upload, X, Mail, Eye, EyeOff } from 'lucide-react'
+import api from '../services/api'
 
 const Settings = () => {
+  const [appSettings, setAppSettings] = useState({
+    app_name: 'Docode WAF',
+    app_logo: null,
+    signup_enabled: true,
+    smtp_host: '',
+    smtp_port: 587,
+    smtp_username: '',
+    smtp_password: '',
+    smtp_from_email: '',
+    smtp_from_name: 'Docode WAF',
+    smtp_use_tls: true
+  })
+  const [logoPreview, setLogoPreview] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  useEffect(() => {
+    loadAppSettings()
+  }, [])
+
+  const loadAppSettings = async () => {
+    try {
+      const response = await api.get('/settings/app')
+      if (response.data) {
+        setAppSettings(response.data)
+        if (response.data.app_logo) {
+          setLogoPreview(response.data.app_logo)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load app settings:', error)
+    }
+  }
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file')
+        return
+      }
+      
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Logo file size must be less than 2MB')
+        return
+      }
+
+      // Create preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setLogoPreview(reader.result)
+        setAppSettings({ ...appSettings, app_logo: reader.result })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveLogo = () => {
+    setLogoPreview(null)
+    setAppSettings({ ...appSettings, app_logo: null })
+  }
+
+  const handleSaveAppSettings = async () => {
+    setLoading(true)
+    try {
+      await api.post('/settings/app', appSettings)
+      alert('Application settings saved successfully!')
+      // Reload page to update logo in sidebar
+      window.location.reload()
+    } catch (error) {
+      console.error('Failed to save app settings:', error)
+      alert('Failed to save settings: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div>
       <h1 className="text-3xl font-bold mb-8">Settings</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Application Settings */}
+        <div className="card lg:col-span-2">
+          <h2 className="text-xl font-semibold mb-4">Application Settings</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <label className="label">Application Name</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Enter application name"
+                  value={appSettings.app_name}
+                  onChange={(e) => setAppSettings({ ...appSettings, app_name: e.target.value })}
+                />
+                <p className="text-xs text-gray-500 mt-1">This name will appear in the sidebar and page title</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="label">Application Logo</label>
+                <div className="space-y-3">
+                  {logoPreview ? (
+                    <div className="relative inline-block">
+                      <img 
+                        src={logoPreview} 
+                        alt="Logo preview" 
+                        className="h-20 w-20 object-contain border border-gray-300 rounded-lg p-2 bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                      <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">No logo uploaded</p>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <input
+                      type="file"
+                      id="logo-upload"
+                      accept="image/*"
+                      onChange={handleLogoChange}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="logo-upload"
+                      className="btn btn-secondary text-sm cursor-pointer inline-block"
+                    >
+                      {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      PNG, JPG, SVG up to 2MB. Recommended: 200x200px
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={handleSaveAppSettings}
+            disabled={loading}
+            className="btn btn-primary w-full mt-6 disabled:opacity-50"
+          >
+            {loading ? 'Saving...' : 'Save Application Settings'}
+          </button>
+        </div>
+
+        {/* Authentication Settings */}
+        <div className="card lg:col-span-2">
+          <h2 className="text-xl font-semibold mb-4">Authentication Settings</h2>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="label">User Registration</label>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="signup-enabled" 
+                  checked={appSettings.signup_enabled}
+                  onChange={(e) => setAppSettings({ ...appSettings, signup_enabled: e.target.checked })}
+                />
+                <label htmlFor="signup-enabled" className="text-sm">
+                  Enable user self-registration (show signup link on login page)
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                When disabled, only existing users can login. New users can only be created by administrators.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* SMTP Settings */}
+        <div className="card lg:col-span-2">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            SMTP Configuration (Email Sending)
+          </h2>
+          
+          <p className="text-sm text-gray-600 mb-4">
+            Configure SMTP settings to enable email notifications (password reset, alerts, etc.)
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="label">SMTP Host *</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="smtp.gmail.com"
+                value={appSettings.smtp_host || ''}
+                onChange={(e) => setAppSettings({ ...appSettings, smtp_host: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="label">SMTP Port *</label>
+              <input
+                type="number"
+                className="input"
+                placeholder="587"
+                value={appSettings.smtp_port || 587}
+                onChange={(e) => setAppSettings({ ...appSettings, smtp_port: parseInt(e.target.value) })}
+              />
+            </div>
+
+            <div>
+              <label className="label">SMTP Username</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="your-email@gmail.com"
+                value={appSettings.smtp_username || ''}
+                onChange={(e) => setAppSettings({ ...appSettings, smtp_username: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="label">SMTP Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="input pr-10"
+                  placeholder="••••••••"
+                  value={appSettings.smtp_password || ''}
+                  onChange={(e) => setAppSettings({ ...appSettings, smtp_password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">From Email *</label>
+              <input
+                type="email"
+                className="input"
+                placeholder="noreply@yourdomain.com"
+                value={appSettings.smtp_from_email || ''}
+                onChange={(e) => setAppSettings({ ...appSettings, smtp_from_email: e.target.value })}
+              />
+              <p className="text-xs text-gray-500 mt-1">Email address that appears as sender</p>
+            </div>
+
+            <div>
+              <label className="label">From Name</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Docode WAF"
+                value={appSettings.smtp_from_name || 'Docode WAF'}
+                onChange={(e) => setAppSettings({ ...appSettings, smtp_from_name: e.target.value })}
+              />
+              <p className="text-xs text-gray-500 mt-1">Name that appears as sender</p>
+            </div>
+
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="smtp-use-tls" 
+                  checked={appSettings.smtp_use_tls}
+                  onChange={(e) => setAppSettings({ ...appSettings, smtp_use_tls: e.target.checked })}
+                />
+                <label htmlFor="smtp-use-tls" className="text-sm">
+                  Use TLS/SSL (recommended for security)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+            <h3 className="text-sm font-semibold text-blue-900 mb-2">Popular SMTP Providers:</h3>
+            <ul className="text-xs text-blue-800 space-y-1">
+              <li><strong>Gmail:</strong> smtp.gmail.com:587 (Use App Password, not regular password)</li>
+              <li><strong>Outlook:</strong> smtp-mail.outlook.com:587</li>
+              <li><strong>SendGrid:</strong> smtp.sendgrid.net:587</li>
+              <li><strong>Mailgun:</strong> smtp.mailgun.org:587</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Keep existing WAF Configuration card */}
         <div className="card">
           <h2 className="text-xl font-semibold mb-4">WAF Configuration</h2>
           

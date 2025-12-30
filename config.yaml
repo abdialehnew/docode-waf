@@ -4,6 +4,7 @@ server:
   admin_port: 9090
   read_timeout: 30s
   write_timeout: 30s
+  cors_allow_origin: "*"  # Comma-separated list of allowed origins, e.g., "http://localhost:3000,https://example.com" or "*" for all
 
 database:
   driver: "postgres"
@@ -44,7 +45,7 @@ waf:
   # GeoIP
   geoip:
     enabled: true
-    database_path: "./geoip/GeoLite2-Country.mmdb"
+    database_path: "/GeoLite2-Country.mmdb"
     
 ssl:
   auto_cert: false
@@ -55,3 +56,7 @@ logging:
   format: "json" # json, text
   output: "stdout" # stdout, file
   file_path: "./logs/waf.log"
+
+turnstile:
+  site_key: "${TURNSTILE_SITE_KEY}"
+  secret_key: "${TURNSTILE_SECRET_KEY}"

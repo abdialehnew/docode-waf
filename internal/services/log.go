@@ -1,26 +1,59 @@
 package services
 
 import (
-	"github.com/aleh/docode-waf/internal/middleware"
-	"github.com/aleh/docode-waf/internal/models"
+	"time"
+
 	"github.com/jmoiron/sqlx"
 )
+
+// LogService handles logging operations
 type LogService struct {
 	db *sqlx.DB
 }
+
+// NewLogService creates a new log service
 func NewLogService(db *sqlx.DB) *LogService {
 	return &LogService{db: db}
-func (s *LogService) LogRequest(log middleware.RequestLog) {
-	query := `INSERT INTO traffic_logs 
-			  (timestamp, client_ip, method, url, status_code, response_time, bytes_sent, user_agent, blocked, block_reason)
-			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
-	
+}
+
+// LogAttack logs an attack attempt
+func (s *LogService) LogAttack(clientIP, attackType, severity, description string, blocked bool, ruleID *string) error {
+	query := `
+		INSERT INTO attack_logs (
+			id, timestamp, client_ip, attack_type, severity, 
+			description, blocked, rule_id
+		) VALUES (
+			gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7
+		)
+	`
+
 	_, err := s.db.Exec(query,
-		log.Timestamp,
-		log.ClientIP,
-		log.Method,
-		log.URL,
-		log.StatusCode,
-		log.ResponseTime,
-		log.BytesSent,
-}	return logs, err		limit, offset)		"SELECT * FROM traffic_logs ORDER BY timestamp DESC LIMIT $1 OFFSET $2", 	err := s.db.Select(&logs, 	var logs []models.TrafficLogfunc (s *LogService) GetTrafficLogs(limit int, offset int) ([]models.TrafficLog, error) {}	return attacks, err		"SELECT * FROM attack_logs ORDER BY timestamp DESC LIMIT $1", limit)	err := s.db.Select(&attacks, 	var attacks []models.AttackLogfunc (s *LogService) GetRecentAttacks(limit int) ([]models.AttackLog, error) {}	}		// Log error but don't stop execution	if err != nil {		)		log.Blocked,		log.Description,		log.Severity,		log.AttackType,		log.ClientIP,		log.Timestamp,	_, err := s.db.Exec(query,				  VALUES ($1, $2, $3, $4, $5, $6)`			  (timestamp, client_ip, attack_type, severity, description, blocked)	query := `INSERT INTO attack_logs func (s *LogService) LogAttack(log middleware.AttackLog) {}	}		// In production, use proper logging framework		// Log error but don't stop execution	if err != nil {		)		log.BlockReason,		log.Blocked,		log.UserAgent,
+		time.Now(),
+		clientIP,
+		attackType,
+		severity,
+		description,
+		blocked,
+		ruleID,
+	)
+
+	return err
+}
+
+// GetTrafficStats returns traffic statistics
+func (s *LogService) GetTrafficStats(startTime, endTime time.Time) (map[string]interface{}, error) {
+	stats := make(map[string]interface{})
+
+	query := `
+		SELECT 
+			COUNT(*) as total_requests,
+			COUNT(CASE WHEN blocked THEN 1 END) as blocked_requests,
+			AVG(response_time) as avg_response_time,
+			SUM(bytes_sent) as total_bytes
+		FROM traffic_logs
+		WHERE timestamp BETWEEN $1 AND $2
+	`
+
+	err := s.db.QueryRowx(query, startTime, endTime).MapScan(stats)
+	return stats, err
+}

@@ -1,9 +1,121 @@
 package middleware
 
 import (
-	"context"
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
-}	})		next.ServeHTTP(w, r)		}			return			http.Error(w, "Access denied", http.StatusForbidden)			r = r.WithContext(ctx)			ctx = context.WithValue(ctx, "block_reason", "ip_blocked")			ctx := context.WithValue(r.Context(), "blocked", true)		if ib.IsBlocked(ip) {		ip := getClientIP(r)	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {func (ib *IPBlocker) Middleware(next http.Handler) http.Handler {}	return false	}		}			}				return true			if err == nil && ipNet.Contains(clientIP) {			_, ipNet, err := net.ParseCIDR(blockedIP)		if strings.Contains(blockedIP, "/") {		// Check if it's a CIDR	for blockedIP := range ib.blacklist {	}		return false	if clientIP == nil {	clientIP := net.ParseIP(ip)	// Check CIDR blocks	}		return true	if ib.blacklist[ip] {	// Check if IP is in blacklist	}		return false	if ib.whitelist[ip] {	// Whitelist takes precedencefunc (ib *IPBlocker) IsBlocked(ip string) bool {}	}		ib.whitelist[ip] = true	for _, ip := range ips {	ib.whitelist = make(map[string]bool)func (ib *IPBlocker) LoadWhitelist(ips []string) {}	}		ib.blacklist[ip] = true	for _, ip := range ips {	ib.blacklist = make(map[string]bool)func (ib *IPBlocker) LoadBlacklist(ips []string) {}	delete(ib.whitelist, ip)func (ib *IPBlocker) RemoveFromWhitelist(ip string) {}	delete(ib.blacklist, ip)func (ib *IPBlocker) RemoveFromBlacklist(ip string) {}	ib.whitelist[ip] = truefunc (ib *IPBlocker) AddToWhitelist(ip string) {}	ib.blacklist[ip] = truefunc (ib *IPBlocker) AddToBlacklist(ip string) {}	}		whitelist: make(map[string]bool),		blacklist: make(map[string]bool),	return &IPBlocker{func NewIPBlocker() *IPBlocker {}	whitelist map[string]bool	blacklist map[string]booltype IPBlocker struct {
+
+// IPBlockerMiddleware blocks requests from blacklisted IPs and allows only whitelisted IPs
+func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		clientIP := c.ClientIP()
+
+		// Check whitelist first
+		whitelisted, err := isIPInGroup(db, clientIP, "whitelist")
+		if err == nil && whitelisted {
+			c.Next()
+			return
+		}
+
+		// Check blacklist
+		blacklisted, err := isIPInGroup(db, clientIP, "blacklist")
+		if err == nil && blacklisted {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Access denied",
+			})
+			c.Abort()
+			return
+		}
+
+		// Check blocking rules
+		blocked, reason := checkBlockingRules(db, c)
+		if blocked {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": reason,
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func isIPInGroup(db *sqlx.DB, clientIP, groupType string) (bool, error) {
+	query := `
+		SELECT COUNT(*) FROM ip_addresses ia
+		JOIN ip_groups ig ON ia.group_id = ig.id
+		WHERE ig.type = $1 AND ia.ip_address = $2
+	`
+	var count int
+	err := db.Get(&count, query, groupType, clientIP)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func checkBlockingRules(db *sqlx.DB, c *gin.Context) (bool, string) {
+	clientIP := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+	url := c.Request.URL.Path
+
+	var rules []struct {
+		Type    string
+		Pattern string
+		Action  string
+	}
+
+	query := `
+		SELECT type, pattern, action FROM blocking_rules 
+		WHERE enabled = true 
+		ORDER BY priority DESC
+	`
+	err := db.Select(&rules, query)
+	if err != nil {
+		return false, ""
+	}
+
+	for _, rule := range rules {
+		matched := false
+
+		switch rule.Type {
+		case "ip":
+			if matchIP(clientIP, rule.Pattern) {
+				matched = true
+			}
+		case "url":
+			if strings.Contains(url, rule.Pattern) {
+				matched = true
+			}
+		case "user_agent":
+			if strings.Contains(strings.ToLower(userAgent), strings.ToLower(rule.Pattern)) {
+				matched = true
+			}
+		}
+
+		if matched && rule.Action == "block" {
+			return true, "Blocked by security rule"
+		}
+	}
+
+	return false, ""
+}
+
+func matchIP(ip, pattern string) bool {
+	// Check if pattern is CIDR
+	if strings.Contains(pattern, "/") {
+		_, ipNet, err := net.ParseCIDR(pattern)
+		if err != nil {
+			return false
+		}
+		testIP := net.ParseIP(ip)
+		return ipNet.Contains(testIP)
+	}
+	// Exact match
+	return ip == pattern
+}

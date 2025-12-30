@@ -1,6 +1,44 @@
 -- Create extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Admins table for authentication
+CREATE TABLE admins (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(255),
+    role VARCHAR(50) DEFAULT 'admin',
+    is_active BOOLEAN DEFAULT true,
+    last_login TIMESTAMP,
+    reset_token VARCHAR(255),
+    reset_token_expiry TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create index on email and username
+CREATE INDEX idx_admins_email ON admins(email);
+CREATE INDEX idx_admins_username ON admins(username);
+
+-- SSL Certificates table
+CREATE TABLE certificates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL UNIQUE,
+    cert_content TEXT NOT NULL,
+    key_content TEXT NOT NULL,
+    common_name VARCHAR(255),
+    issuer VARCHAR(255),
+    valid_from TIMESTAMP NOT NULL,
+    valid_to TIMESTAMP NOT NULL,
+    status VARCHAR(50) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_certificates_status ON certificates(status);
+CREATE INDEX idx_certificates_valid_to ON certificates(valid_to);
+
 -- Virtual Hosts table
 CREATE TABLE vhosts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -144,4 +182,10 @@ CREATE TRIGGER update_rate_limit_rules_updated_at BEFORE UPDATE ON rate_limit_ru
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_ssl_certificates_updated_at BEFORE UPDATE ON ssl_certificates
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_certificates_updated_at BEFORE UPDATE ON certificates
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_admins_updated_at BEFORE UPDATE ON admins
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

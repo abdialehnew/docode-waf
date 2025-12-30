@@ -2,11 +2,47 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"sync"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
-type HTTPFloodProtector struct {
-	requests map[string]*requestCounter
-	mu       sync.RWMutex
-}	})		next.ServeHTTP(w, r)		}			return			http.Error(w, "HTTP flood detected - IP blocked", http.StatusTooManyRequests)			r = r.WithContext(ctx)			ctx = context.WithValue(ctx, "block_reason", "http_flood")			ctx := context.WithValue(r.Context(), "blocked", true)		if !hfp.recordRequest(ip) {		// Record request and check limit		}			return			http.Error(w, "Too many requests - temporarily blocked", http.StatusTooManyRequests)			r = r.WithContext(ctx)			ctx = context.WithValue(ctx, "block_reason", "http_flood")			ctx := context.WithValue(r.Context(), "blocked", true)		if hfp.isBlocked(ip) {		// Check if IP is blocked		ip := getClientIP(r)	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {func (hfp *HTTPFloodProtector) Middleware(next http.Handler) http.Handler {}	return true	}		return false		hfp.mu.Unlock()		hfp.blocked[ip] = now.Add(hfp.blockDur)		hfp.mu.Lock()	if counter.count > hfp.maxReqs {	// Check if limit exceeded	counter.count++	}		counter.window = now		counter.count = 0	if now.Sub(counter.window) > hfp.window {	// Reset counter if window has passed	now := time.Now()	defer counter.mu.Unlock()	counter.mu.Lock()	hfp.mu.Unlock()	}		hfp.requests[ip] = counter		}			window: time.Now(),			count:  0,		counter = &requestCounter{	if !exists {	counter, exists := hfp.requests[ip]	hfp.mu.Lock()func (hfp *HTTPFloodProtector) recordRequest(ip string) bool {}	return true	}		return false	if time.Now().After(blockedUntil) {	}		return false	if !exists {	blockedUntil, exists := hfp.blocked[ip]	defer hfp.mu.RUnlock()	hfp.mu.RLock()func (hfp *HTTPFloodProtector) isBlocked(ip string) bool {}	}		hfp.mu.Unlock()		}			counter.mu.Unlock()			}				delete(hfp.requests, ip)			if now.Sub(counter.window) > hfp.window*2 {			counter.mu.Lock()		for ip, counter := range hfp.requests {		// Clean up old request counters		}			}				delete(hfp.blocked, ip)			if now.After(blockedUntil) {		for ip, blockedUntil := range hfp.blocked {		// Clean up blocked IPs		now := time.Now()		hfp.mu.Lock()	for range ticker.C {	defer ticker.Stop()	ticker := time.NewTicker(1 * time.Minute)func (hfp *HTTPFloodProtector) cleanup() {}	return hfp	go hfp.cleanup()	// Clean up old entries periodically	}		blockDur: blockDuration,		window:   time.Minute,		maxReqs:  maxRequestsPerMinute,		blocked:  make(map[string]time.Time),		requests: make(map[string]*requestCounter),	hfp := &HTTPFloodProtector{func NewHTTPFloodProtector(maxRequestsPerMinute int, blockDuration time.Duration) *HTTPFloodProtector {}	mu        sync.Mutex	window    time.Time	count     inttype requestCounter struct {}	blocked  map[string]time.Time	blockDur time.Duration	window   time.Duration	maxReqs  int
+
+// HTTPFloodProtectionMiddleware protects against HTTP flood attacks
+func HTTPFloodProtectionMiddleware(redisClient *redis.Client, maxRequests int, window time.Duration) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		clientIP := c.ClientIP()
+		key := fmt.Sprintf("httpflood:%s", clientIP)
+		ctx := context.Background()
+
+		// Get request count in time window
+		count, err := redisClient.Get(ctx, key).Int()
+		if err != nil && err != redis.Nil {
+			c.Next()
+			return
+		}
+
+		// Check if threshold exceeded
+		if count >= maxRequests {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error": "Too many requests detected",
+			})
+			c.Abort()
+			return
+		}
+
+		// Increment counter with expiration
+		pipe := redisClient.Pipeline()
+		pipe.Incr(ctx, key)
+		pipe.Expire(ctx, key, window)
+		_, err = pipe.Exec(ctx)
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		c.Next()
+	}
+}
