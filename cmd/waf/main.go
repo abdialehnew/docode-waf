@@ -136,7 +136,7 @@ func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, 
 func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, authHandler *api.AuthHandler,
 	dashboardHandler *api.DashboardHandler, vhostHandler *api.VHostHandler,
 	ipGroupHandler *api.IPGroupHandler, certHandler *api.CertificateHandler, settingsHandler *api.SettingsHandler,
-	blockingHandler *api.BlockingRuleHandler, rateLimitHandler *api.RateLimitHandler, cfg *config.Config) {
+	blockingHandler *api.BlockingRuleHandler, rateLimitHandler *api.RateLimitHandler, logsHandler *api.LogsHandler, cfg *config.Config) {
 
 	// Public Auth routes (no authentication required)
 	auth := apiV1.Group("/auth")
@@ -218,6 +218,13 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		protected.DELETE(constants.RouteRateLimitRuleID, rateLimitHandler.DeleteRateLimitRule)
 		protected.PATCH(constants.RouteRateLimitRuleID+"/toggle", rateLimitHandler.ToggleRateLimitRule)
 
+		// Logs & Monitoring
+		protected.GET("/logs/vhosts", logsHandler.GetVHostsForLogs)
+		protected.GET("/logs/nginx/access", logsHandler.GetNginxAccessLogs)
+		protected.GET("/logs/nginx/error", logsHandler.GetNginxErrorLogs)
+		protected.GET("/logs/nginx/stream", logsHandler.StreamNginxLogs)
+		protected.GET("/logs/waf", logsHandler.GetWAFLogs)
+
 		// Settings (POST only, GET is public)
 		protected.POST("/settings/app", settingsHandler.SaveAppSettings)
 	}
@@ -238,6 +245,7 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 	settingsHandler := api.NewSettingsHandler(db)
 	blockingHandler := api.NewBlockingRuleHandler(db)
 	rateLimitHandler := api.NewRateLimitHandler(db)
+	logsHandler := api.NewLogsHandler(db)
 
 	// Setup admin API
 	adminRouter := gin.Default()
@@ -283,7 +291,7 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 
 	// API routes
 	apiV1 := adminRouter.Group("/api/v1")
-	setupAPIRoutes(apiV1, authService, authHandler, dashboardHandler, vhostHandler, ipGroupHandler, certHandler, settingsHandler, blockingHandler, rateLimitHandler, cfg)
+	setupAPIRoutes(apiV1, authService, authHandler, dashboardHandler, vhostHandler, ipGroupHandler, certHandler, settingsHandler, blockingHandler, rateLimitHandler, logsHandler, cfg)
 
 	// Health check
 	adminRouter.GET("/health", func(c *gin.Context) {

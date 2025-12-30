@@ -12,6 +12,7 @@ import IPGroups from './pages/IPGroups'
 import TrafficLogs from './pages/TrafficLogs'
 import Certificates from './pages/Certificates'
 import Settings from './pages/Settings'
+import Monitoring from './pages/Monitoring'
 
 function App() {
   return (
@@ -63,6 +64,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Certificates />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/monitoring" element={
+            <ProtectedRoute>
+              <Layout>
+                <Monitoring />
               </Layout>
             </ProtectedRoute>
           } />

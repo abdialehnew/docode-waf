@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Shield, LayoutDashboard, Server, Users, Activity, Lock, Settings, LogOut, User } from 'lucide-react'
+import { Shield, LayoutDashboard, Server, Users, Activity, Lock, Settings, LogOut, User, FileText } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useState, useEffect } from 'react'
 import ConfirmModal from './ConfirmModal'
@@ -37,6 +37,7 @@ const Layout = ({ children }) => {
     { name: 'IP Groups', path: '/ip-groups', icon: Users },
     { name: 'Traffic Logs', path: '/traffic', icon: Activity },
     { name: 'SSL Certificates', path: '/certificates', icon: Lock },
+    { name: 'Monitoring', path: '/monitoring', icon: FileText },
     { name: 'Settings', path: '/settings', icon: Settings },
   ]
 
