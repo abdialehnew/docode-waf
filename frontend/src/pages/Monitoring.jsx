@@ -7,12 +7,15 @@ const Monitoring = () => {
   const [activeTab, setActiveTab] = useState('nginx');
   const [vhosts, setVhosts] = useState([]);
   const [selectedVhost, setSelectedVhost] = useState('');
+  const [vhostSearch, setVhostSearch] = useState('');
+  const [showVhostDropdown, setShowVhostDropdown] = useState(false);
   const [logType, setLogType] = useState('access');
   const [nginxLogs, setNginxLogs] = useState([]);
   const [wafLogs, setWafLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
   const [timeRange, setTimeRange] = useState('1D'); // 1D, 7D, or 'custom'
+  const [wafTimeRange, setWafTimeRange] = useState('1D'); // For WAF logs
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -20,7 +23,17 @@ const Monitoring = () => {
 
   useEffect(() => {
     fetchVhosts();
-  }, []);
+    
+    // Close dropdown when clicking outside
+    const handleClickOutside = (event) => {
+      if (showVhostDropdown && !event.target.closest('.relative')) {
+        setShowVhostDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showVhostDropdown]);
 
   useEffect(() => {
     if (selectedVhost && activeTab === 'nginx') {
@@ -32,7 +45,22 @@ const Monitoring = () => {
     if (activeTab === 'waf') {
       fetchWAFLogs();
     }
-  }, [activeTab, dateRange]);
+  }, [activeTab, dateRange, wafTimeRange]);
+
+  useEffect(() => {
+    // Update dateRange when wafTimeRange changes
+    if (wafTimeRange === '1D') {
+      setDateRange({
+        start: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+      });
+    } else if (wafTimeRange === '7D') {
+      setDateRange({
+        start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+      });
+    }
+  }, [wafTimeRange]);
 
   useEffect(() => {
     let interval;
@@ -157,17 +185,44 @@ const Monitoring = () => {
                         No virtual hosts available
                       </div>
                     ) : (
-                      <select
-                        value={selectedVhost}
-                        onChange={(e) => setSelectedVhost(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        {vhosts.map((vhost) => (
-                          <option key={vhost.domain} value={vhost.domain}>
-                            {vhost.name} ({vhost.domain})
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={vhostSearch || vhosts.find(v => v.domain === selectedVhost)?.name || ''}
+                          onChange={(e) => {
+                            setVhostSearch(e.target.value);
+                            setShowVhostDropdown(true);
+                          }}
+                          onFocus={() => setShowVhostDropdown(true)}
+                          placeholder="Search virtual host..."
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
+                        {showVhostDropdown && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {vhosts
+                              .filter(vhost => 
+                                vhost.name.toLowerCase().includes(vhostSearch.toLowerCase()) ||
+                                vhost.domain.toLowerCase().includes(vhostSearch.toLowerCase())
+                              )
+                              .map((vhost) => (
+                                <div
+                                  key={vhost.domain}
+                                  onClick={() => {
+                                    setSelectedVhost(vhost.domain);
+                                    setVhostSearch('');
+                                    setShowVhostDropdown(false);
+                                  }}
+                                  className={`px-3 py-2 cursor-pointer hover:bg-gray-100 ${
+                                    selectedVhost === vhost.domain ? 'bg-blue-50' : ''
+                                  }`}
+                                >
+                                  <div className="font-medium">{vhost.name}</div>
+                                  <div className="text-sm text-gray-500">{vhost.domain}</div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -281,34 +336,67 @@ const Monitoring = () => {
               <CardTitle>WAF Logs</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Date Range Filter */}
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">Start Date</label>
-                  <input
-                    type="date"
-                    value={dateRange.start}
-                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+              {/* Time Range Filter */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Time Range</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setWafTimeRange('1D')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        wafTimeRange === '1D'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      1 Day
+                    </button>
+                    <button
+                      onClick={() => setWafTimeRange('7D')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        wafTimeRange === '7D'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      7 Days
+                    </button>
+                    <button
+                      onClick={() => setWafTimeRange('custom')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        wafTimeRange === 'custom'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Date Range
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-2">End Date</label>
-                  <input
-                    type="date"
-                    value={dateRange.end}
-                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    onClick={fetchWAFLogs}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                  >
-                    Apply
-                  </button>
-                </div>
+
+                {/* Custom Date Range */}
+                {wafTimeRange === 'custom' && (
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium mb-2">Start Date</label>
+                      <input
+                        type="date"
+                        value={dateRange.start}
+                        onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium mb-2">End Date</label>
+                      <input
+                        type="date"
+                        value={dateRange.end}
+                        onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* WAF Logs Table */}
