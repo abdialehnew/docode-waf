@@ -1,4 +1,4 @@
-# DCode WAF - Web Application Firewall
+# DoCode WAF - Web Application Firewall
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Go Version](https://img.shields.io/badge/Go-1.25.5-00ADD8?logo=go)
