@@ -83,9 +83,7 @@ const Monitoring = () => {
       const response = await api.get('/logs/vhosts');
       const data = response.data || [];
       setVhosts(data);
-      if (Array.isArray(data) && data.length > 0) {
-        setSelectedVhost(data[0].domain);
-      }
+      // Don't auto-select first vhost, let user choose
     } catch (error) {
       console.error('Failed to fetch vhosts:', error);
       setVhosts([]);
@@ -188,19 +186,20 @@ const Monitoring = () => {
                       <div className="relative">
                         <input
                           type="text"
-                          value={vhostSearch || vhosts.find(v => v.domain === selectedVhost)?.name || ''}
+                          value={vhostSearch || (selectedVhost ? vhosts.find(v => v.domain === selectedVhost)?.name : '')}
                           onChange={(e) => {
                             setVhostSearch(e.target.value);
                             setShowVhostDropdown(true);
                           }}
                           onFocus={() => setShowVhostDropdown(true)}
-                          placeholder="Search virtual host..."
+                          placeholder="Select Virtual Host"
                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
                         {showVhostDropdown && (
                           <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                             {vhosts
                               .filter(vhost => 
+                                !vhostSearch || 
                                 vhost.name.toLowerCase().includes(vhostSearch.toLowerCase()) ||
                                 vhost.domain.toLowerCase().includes(vhostSearch.toLowerCase())
                               )
