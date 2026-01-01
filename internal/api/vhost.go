@@ -49,6 +49,12 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 		MaxUploadSize       int             `db:"max_upload_size" json:"max_upload_size"`
 		ProxyReadTimeout    int             `db:"proxy_read_timeout" json:"proxy_read_timeout"`
 		ProxyConnectTimeout int             `db:"proxy_connect_timeout" json:"proxy_connect_timeout"`
+		BotDetectionEnabled bool            `db:"bot_detection_enabled" json:"bot_detection_enabled"`
+		BotDetectionType    string          `db:"bot_detection_type" json:"bot_detection_type"`
+		RecaptchaVersion    string          `db:"recaptcha_version" json:"recaptcha_version"`
+		RateLimitEnabled    bool            `db:"rate_limit_enabled" json:"rate_limit_enabled"`
+		RateLimitRequests   int             `db:"rate_limit_requests" json:"rate_limit_requests"`
+		RateLimitWindow     int             `db:"rate_limit_window" json:"rate_limit_window"`
 		CustomHeaders       json.RawMessage `db:"custom_headers" json:"custom_headers"`
 		CreatedAt           time.Time       `db:"created_at" json:"created_at"`
 		UpdatedAt           time.Time       `db:"updated_at" json:"updated_at"`
@@ -60,8 +66,10 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 		SELECT id::text, name, domain, backend_url, ssl_enabled, 
 		       ssl_certificate_id::text, ssl_cert_path, ssl_key_path, enabled,
 		       websocket_enabled, http_version, tls_version, max_upload_size,
-		       proxy_read_timeout, proxy_connect_timeout, custom_headers,
-		       created_at, updated_at
+		       proxy_read_timeout, proxy_connect_timeout,
+		       bot_detection_enabled, bot_detection_type, recaptcha_version,
+		       rate_limit_enabled, rate_limit_requests, rate_limit_window,
+		       custom_headers, created_at, updated_at
 		FROM vhosts 
 		ORDER BY created_at DESC
 	`
@@ -124,6 +132,12 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 			"max_upload_size":       vhost.MaxUploadSize,
 			"proxy_read_timeout":    vhost.ProxyReadTimeout,
 			"proxy_connect_timeout": vhost.ProxyConnectTimeout,
+			"bot_detection_enabled": vhost.BotDetectionEnabled,
+			"bot_detection_type":    vhost.BotDetectionType,
+			"recaptcha_version":     vhost.RecaptchaVersion,
+			"rate_limit_enabled":    vhost.RateLimitEnabled,
+			"rate_limit_requests":   vhost.RateLimitRequests,
+			"rate_limit_window":     vhost.RateLimitWindow,
 			"custom_headers":        vhost.CustomHeaders,
 			"custom_locations":      customLocs,
 			"created_at":            vhost.CreatedAt,
@@ -234,6 +248,12 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		MaxUploadSize       int                    `json:"max_upload_size"`
 		ProxyReadTimeout    int                    `json:"proxy_read_timeout"`
 		ProxyConnectTimeout int                    `json:"proxy_connect_timeout"`
+		BotDetectionEnabled bool                   `json:"bot_detection_enabled"`
+		BotDetectionType    string                 `json:"bot_detection_type"`
+		RecaptchaVersion    string                 `json:"recaptcha_version"`
+		RateLimitEnabled    bool                   `json:"rate_limit_enabled"`
+		RateLimitRequests   int                    `json:"rate_limit_requests"`
+		RateLimitWindow     int                    `json:"rate_limit_window"`
 		CustomHeaders       map[string]interface{} `json:"custom_headers"`
 		CustomLocations     []map[string]string    `json:"custom_locations"`
 	}
@@ -253,6 +273,15 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	if input.ProxyConnectTimeout == 0 {
 		input.ProxyConnectTimeout = 60
 	}
+	if input.BotDetectionType == "" {
+		input.BotDetectionType = "turnstile"
+	}
+	if input.RateLimitRequests == 0 {
+		input.RateLimitRequests = 100
+	}
+	if input.RateLimitWindow == 0 {
+		input.RateLimitWindow = 60
+	}
 	if input.CustomHeaders == nil {
 		input.CustomHeaders = make(map[string]interface{})
 	}
@@ -269,8 +298,10 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		                   ssl_certificate_id, ssl_cert_path, ssl_key_path, enabled,
 		                   websocket_enabled, http_version, tls_version, max_upload_size,
 		                   proxy_read_timeout, proxy_connect_timeout,
+		                   bot_detection_enabled, bot_detection_type, recaptcha_version,
+		                   rate_limit_enabled, rate_limit_requests, rate_limit_window,
 		                   custom_headers, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
 		RETURNING id
 	`
 
@@ -290,6 +321,12 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		input.MaxUploadSize,
 		input.ProxyReadTimeout,
 		input.ProxyConnectTimeout,
+		input.BotDetectionEnabled,
+		input.BotDetectionType,
+		input.RecaptchaVersion,
+		input.RateLimitEnabled,
+		input.RateLimitRequests,
+		input.RateLimitWindow,
 		customHeadersJSON,
 		time.Now(),
 		time.Now(),
@@ -370,6 +407,12 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		MaxUploadSize       int                    `json:"max_upload_size"`
 		ProxyReadTimeout    int                    `json:"proxy_read_timeout"`
 		ProxyConnectTimeout int                    `json:"proxy_connect_timeout"`
+		BotDetectionEnabled bool                   `json:"bot_detection_enabled"`
+		BotDetectionType    string                 `json:"bot_detection_type"`
+		RecaptchaVersion    string                 `json:"recaptcha_version"`
+		RateLimitEnabled    bool                   `json:"rate_limit_enabled"`
+		RateLimitRequests   int                    `json:"rate_limit_requests"`
+		RateLimitWindow     int                    `json:"rate_limit_window"`
 		CustomHeaders       map[string]interface{} `json:"custom_headers"`
 		CustomLocations     []map[string]string    `json:"custom_locations"`
 	}
@@ -384,8 +427,11 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		SET name = $1, domain = $2, backend_url = $3, ssl_enabled = $4,
 		    ssl_certificate_id = $5, ssl_cert_path = $6, ssl_key_path = $7, enabled = $8,
 		    websocket_enabled = $9, http_version = $10, tls_version = $11, max_upload_size = $12,
-		    proxy_read_timeout = $13, proxy_connect_timeout = $14, custom_headers = $15, updated_at = $16
-		WHERE id = $17
+		    proxy_read_timeout = $13, proxy_connect_timeout = $14,
+		    bot_detection_enabled = $15, bot_detection_type = $16, recaptcha_version = $17,
+		    rate_limit_enabled = $18, rate_limit_requests = $19, rate_limit_window = $20,
+		    custom_headers = $21, updated_at = $22
+		WHERE id = $23
 	`
 
 	// Set defaults
@@ -427,6 +473,12 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		input.MaxUploadSize,
 		input.ProxyReadTimeout,
 		input.ProxyConnectTimeout,
+		input.BotDetectionEnabled,
+		input.BotDetectionType,
+		input.RecaptchaVersion,
+		input.RateLimitEnabled,
+		input.RateLimitRequests,
+		input.RateLimitWindow,
 		customHeadersJSON,
 		time.Now(),
 		id,

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getIPGroups, createIPGroup, updateIPGroup, deleteIPGroup, addIPToGroup, getGroupIPs, updateIPAddress, removeIPFromGroup, getVHosts } from '../services/api'
-import { Plus, Trash2, Shield, Edit2, Eye, Globe } from 'lucide-react'
+import { getIPGroups, createIPGroup, updateIPGroup, deleteIPGroup, addIPToGroup, getGroupIPs, updateIPAddress, removeIPFromGroup } from '../services/api'
+import { Plus, Trash2, Shield, Edit2, Eye } from 'lucide-react'
 import ConfirmModal from '../components/ConfirmModal'
 
 const IPGroups = () => {
   const [groups, setGroups] = useState([])
-  const [vhosts, setVhosts] = useState([])
   const [loading, setLoading] = useState(true)
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [showIPModal, setShowIPModal] = useState(false)
@@ -19,7 +18,6 @@ const IPGroups = () => {
     name: '',
     description: '',
     type: 'blacklist',
-    vhost_id: null,
   })
   const [ipFormData, setIPFormData] = useState({
     ip_address: '',
@@ -29,18 +27,7 @@ const IPGroups = () => {
 
   useEffect(() => {
     loadGroups()
-    loadVhosts()
   }, [])
-
-  const loadVhosts = async () => {
-    try {
-      const response = await getVHosts()
-      setVhosts(response.data || [])
-    } catch (error) {
-      console.error('Failed to load vhosts:', error)
-      setVhosts([])
-    }
-  }
 
   const loadGroups = async () => {
     try {
@@ -64,7 +51,7 @@ const IPGroups = () => {
       }
       setShowGroupModal(false)
       setEditingGroup(null)
-      setFormData({ name: '', description: '', type: 'blacklist', vhost_id: null })
+      setFormData({ name: '', description: '', type: 'blacklist' })
       loadGroups()
     } catch (error) {
       console.error('Failed to save group:', error)
@@ -76,8 +63,7 @@ const IPGroups = () => {
     setFormData({
       name: group.name,
       description: group.description,
-      type: group.type,
-      vhost_id: group.vhost_id
+      type: group.type
     })
     setShowGroupModal(true)
   }
@@ -118,12 +104,6 @@ const IPGroups = () => {
     try {
       await addIPToGroup(selectedGroup.id, ipFormData)
       setShowIPModal(false)
-      setIPFormData({ ip_address: '', cidr_mask: null, description: '' })
-      handleViewIPs(selectedGroup)
-    } catch (error) {
-      console.error('Failed to add IP:', error)
-    }
-  }
 
   const handleIPEdit = (ip) => {
     setEditingIP({
@@ -161,6 +141,12 @@ const IPGroups = () => {
       handleIPSave(ipId)
     }
   }
+      setIPFormData({ ip_address: '', cidr_mask: null, description: '' })
+      handleViewIPs(selectedGroup)
+    } catch (error) {
+      console.error('Failed to add IP:', error)
+    }
+  }
 
   const handleRemoveIP = async (ipId) => {
     try {
@@ -180,11 +166,7 @@ const IPGroups = () => {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">IP Groups</h1>
         <button
-          onClick={() => {
-            setEditingGroup(null)
-            setFormData({ name: '', description: '', type: 'blacklist', vhost_id: null })
-            setShowGroupModal(true)
-          }}
+          onClick={() => setShowGroupModal(true)}
           className="btn btn-primary flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
@@ -204,91 +186,73 @@ const IPGroups = () => {
                     group.type === 'blacklist' ? 'text-red-600' : 'text-green-600'
                   }`} />
                 </div>
-                <div className="flex-1">
+                <div>
                   <h3 className="font-semibold">{group.name}</h3>
                   <p className="text-sm text-gray-600">{group.description}</p>
-                  {group.vhost_domain && (
-                    <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                      <Globe className="w-3 h-3" />
-                      {group.vhost_domain}
-                    </p>
-                  )}
-                  {!group.vhost_id && (
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <Globe className="w-3 h-3" />
-                      Global (All Vhosts)
-                    </p>
-                  )}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEditGroup(group)}
-                  className="text-blue-600 hover:text-blue-800"
-                  title="Edit Group"
-                >
-                  <Edit2 className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => handleDeleteGroup(group.id)}
-                  className="text-red-600 hover:text-red-800"
-                  title="Delete Group"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
+              <button
+                onClick={() => handleDeleteGroup(group.id)}
+                className="text-red-600 hover:text-red-800"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             </div>
-            <div className="flex items-center justify-between pt-3 border-t">
-              <span className={`inline-flex px-2 py-1 rounded text-sm font-medium ${
+
+            <div className="space-y-2">
+              <span className={`inline-block px-3 py-1 rounded text-sm ${
                 group.type === 'blacklist'
                   ? 'bg-red-100 text-red-800'
                   : 'bg-green-100 text-green-800'
               }`}>
-                {group.type.charAt(0).toUpperCase() + group.type.slice(1)}
+                {group.type}
               </span>
+              
               <button
                 onClick={() => handleViewIPs(group)}
-                className="btn btn-sm btn-secondary flex items-center gap-2"
+                className="block w-full mt-2 text-sm text-primary-600 hover:text-primary-800"
               >
-                <Eye className="w-4 h-4" />
-                View IPs
+                View IPs →
               </button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Create/Edit Group Modal */}
+      {/* Group Modal */}
       {showGroupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-4">
-              {editingGroup ? 'Edit IP Group' : 'Create IP Group'}
-            </h2>
+            <h2 className="text-2xl font-bold mb-4">{editingGroup ? 'Edit IP Group' : 'Add IP Group'}</h2>
             <form onSubmit={handleCreateGroup} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
+                <label htmlFor="group-name" className="label">Name</label>
                 <input
+                  id="group-name"
                   type="text"
-                  className="input w-full"
+                  className="input"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label htmlFor="group-description" className="label">Description</label>
                 <textarea
-                  className="input w-full"
+                  id="group-description"
+                  className="input"
                   rows="3"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">Type</label>
+                <label htmlFor="group-type" className="label">Type</label>
                 <select
-                  className="input w-full"
+                  id="group-type"
+                  className="input"
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 >
@@ -296,25 +260,8 @@ const IPGroups = () => {
                   <option value="whitelist">Whitelist</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Virtual Host (Optional)</label>
-                <select
-                  className="input w-full"
-                  value={formData.vhost_id || ''}
-                  onChange={(e) => setFormData({ ...formData, vhost_id: e.target.value || null })}
-                >
-                  <option value="">Global (Apply to All Vhosts)</option>
-                  {(vhosts || []).map((vhost) => (
-                    <option key={vhost.id} value={vhost.id}>
-                      {vhost.domain} - {vhost.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Select a vhost to apply this rule only to that domain, or leave as Global to apply to all vhosts
-                </p>
-              </div>
-              <div className="flex gap-2">
+
+              <div className="flex gap-2 pt-4">
                 <button type="submit" className="btn btn-primary flex-1">
                   {editingGroup ? 'Update' : 'Create'}
                 </button>
@@ -323,7 +270,7 @@ const IPGroups = () => {
                   onClick={() => {
                     setShowGroupModal(false)
                     setEditingGroup(null)
-                    setFormData({ name: '', description: '', type: 'blacklist', vhost_id: null })
+                    setFormData({ name: '', description: '', type: 'blacklist' })
                   }}
                   className="btn btn-secondary flex-1"
                 >
@@ -335,19 +282,17 @@ const IPGroups = () => {
         </div>
       )}
 
-      {/* View IPs Modal */}
-      {selectedGroup && (
+      {/* IP Details Modal */}
+      {selectedGroup && !showIPModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">
-                {selectedGroup.name} - IP Addresses
-              </h2>
+              <h2 className="text-2xl font-bold">{selectedGroup.name} - IPs</h2>
               <button
                 onClick={() => setShowIPModal(true)}
-                className="btn btn-primary btn-sm flex items-center gap-2"
+                className="btn btn-primary flex items-center gap-2"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-5 h-5" />
                 Add IP
               </button>
             </div>
@@ -355,95 +300,91 @@ const IPGroups = () => {
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {loadingIPs ? (
                 <div className="text-center py-4 text-gray-500">Loading IPs...</div>
-              ) : (groupIPs || []).length === 0 ? (
-                <div className="text-center py-4 text-gray-500">No IPs added yet</div>
-              ) : (
-                (groupIPs || []).map((ip) => (
-                  <div key={ip.id} className="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
-                    {editingIP && editingIP.id === ip.id ? (
-                      <div className="flex-1 space-y-2">
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            className="input flex-1"
-                            placeholder="IP Address"
-                            value={editingIP.ip_address}
-                            onChange={(e) => handleIPChange('ip_address', e.target.value)}
-                            onKeyPress={(e) => handleIPKeyPress(e, ip.id)}
-                            autoFocus
-                          />
-                          <input
-                            type="number"
-                            className="input w-20"
-                            placeholder="CIDR"
-                            min="0"
-                            max="32"
-                            value={editingIP.cidr_mask || ''}
-                            onChange={(e) => handleIPChange('cidr_mask', e.target.value ? Number.parseInt(e.target.value, 10) : null)}
-                            onKeyPress={(e) => handleIPKeyPress(e, ip.id)}
-                          />
-                        </div>
+              ) : (groupIPs || []).length === 0 ? ( hover:bg-gray-100 transition-colors">
+                  {editingIP && editingIP.id === ip.id ? (
+                    <div className="flex-1 space-y-2">
+                      <div className="flex gap-2">
                         <input
                           type="text"
-                          className="input w-full"
-                          placeholder="Description"
-                          value={editingIP.description || ''}
-                          onChange={(e) => handleIPChange('description', e.target.value)}
+                          className="input flex-1"
+                          placeholder="IP Address"
+                          value={editingIP.ip_address}
+                          onChange={(e) => handleIPChange('ip_address', e.target.value)}
+                          onKeyPress={(e) => handleIPKeyPress(e, ip.id)}
+                          autoFocus
+                        />
+                        <input
+                          type="number"
+                          className="input w-20"
+                          placeholder="CIDR"
+                          min="0"
+                          max="32"
+                          value={editingIP.cidr_mask || ''}
+                          onChange={(e) => handleIPChange('cidr_mask', e.target.value ? Number.parseInt(e.target.value, 10) : null)}
                           onKeyPress={(e) => handleIPKeyPress(e, ip.id)}
                         />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleIPSave(ip.id)}
-                            className="btn btn-primary btn-sm"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingIP(null)}
-                            className="btn btn-secondary btn-sm"
-                          >
-                            Cancel
-                          </button>
-                        </div>
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex-1">
-                          <p className="font-mono font-semibold">
-                            {ip.ip_address}{ip.cidr_mask ? `/${ip.cidr_mask}` : ''}
-                          </p>
-                          {ip.description && (
-                            <p className="text-sm text-gray-600">{ip.description}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleIPEdit(ip)}
-                            className="text-blue-600 hover:text-blue-800"
-                            title="Edit IP"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleRemoveIP(ip.id)}
-                            className="text-red-600 hover:text-red-800"
-                            title="Delete IP"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))
-              )}
+                      <input
+                        type="text"
+                        className="input w-full"
+                        placeholder="Description"
+                        value={editingIP.description || ''}
+                        onChange={(e) => handleIPChange('description', e.target.value)}
+                        onKeyPress={(e) => handleIPKeyPress(e, ip.id)}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleIPSave(ip.id)}
+                          className="btn btn-primary btn-sm"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingIP(null)}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1">
+                        <p className="font-mono font-semibold">
+                          {ip.ip_address}{ip.cidr_mask ? `/${ip.cidr_mask}` : ''}
+                        </p>
+                        {ip.description && (
+                          <p className="text-sm text-gray-600">{ip.description}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleIPEdit(ip)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Edit IP"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveIP(ip.id)}
+                          className="text-red-600 hover:text-red-800"
+                          title="Delete IP"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </>
+                  )}={() => handleRemoveIP(ip.id)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )))}
             </div>
 
             <button
-              onClick={() => {
-                setSelectedGroup(null)
-                setEditingIP(null)
-              }}
+              onClick={() => setSelectedGroup(null)}
               className="btn btn-secondary w-full mt-4"
             >
               Close
@@ -459,51 +400,54 @@ const IPGroups = () => {
             <h2 className="text-2xl font-bold mb-4">Add IP Address</h2>
             <form onSubmit={handleAddIP} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">IP Address</label>
+                <label htmlFor="ip-address" className="label">IP Address</label>
                 <input
+                  id="ip-address"
                   type="text"
-                  className="input w-full"
-                  placeholder="e.g., 192.168.1.100"
+                  className="input"
+                  placeholder="192.168.1.1"
                   value={ipFormData.ip_address}
                   onChange={(e) => setIPFormData({ ...ipFormData, ip_address: e.target.value })}
                   required
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">CIDR Mask (optional)</label>
+                <label htmlFor="cidr-mask" className="label">CIDR Mask (optional)</label>
                 <input
+                  id="cidr-mask"
                   type="number"
-                  className="input w-full"
-                  placeholder="e.g., 24 for /24"
+                  className="input"
+                  placeholder="24"
                   min="0"
                   max="32"
                   value={ipFormData.cidr_mask || ''}
-                  onChange={(e) => setIPFormData({
-                    ...ipFormData,
-                    cidr_mask: e.target.value ? Number.parseInt(e.target.value, 10) : null
+                  onChange={(e) => setIPFormData({ 
+                    ...ipFormData, 
+                    cidr_mask: e.target.value ? Number.parseInt(e.target.value, 10) : null 
                   })}
                 />
+                <p className="text-sm text-gray-600 mt-1">For IP blocks (e.g., /24 for 192.168.1.0/24)</p>
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <textarea
-                  className="input w-full"
-                  rows="2"
-                  placeholder="Optional description"
+                <label htmlFor="ip-description" className="label">Description</label>
+                <input
+                  id="ip-description"
+                  type="text"
+                  className="input"
                   value={ipFormData.description}
                   onChange={(e) => setIPFormData({ ...ipFormData, description: e.target.value })}
                 />
               </div>
-              <div className="flex gap-2">
+
+              <div className="flex gap-2 pt-4">
                 <button type="submit" className="btn btn-primary flex-1">
-                  Add IP
+                  Add
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowIPModal(false)
-                    setIPFormData({ ip_address: '', cidr_mask: null, description: '' })
-                  }}
+                  onClick={() => setShowIPModal(false)}
                   className="btn btn-secondary flex-1"
                 >
                   Cancel
@@ -514,13 +458,11 @@ const IPGroups = () => {
         </div>
       )}
 
+      {/* Confirm Modal */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={() => {
-          confirmModal.onConfirm()
-          setConfirmModal({ ...confirmModal, isOpen: false })
-        }}
+        onConfirm={confirmModal.onConfirm}
         title={confirmModal.title}
         message={confirmModal.message}
         type={confirmModal.type}

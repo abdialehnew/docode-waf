@@ -183,6 +183,7 @@ const Login = () => {
                 onError={() => setTurnstileToken('')}
                 onExpire={() => setTurnstileToken('')}
                 size="flexible"
+                theme="auto"
               />
             )}
 

@@ -45,6 +45,12 @@ const VHosts = () => {
     max_upload_size: 10,
     proxy_read_timeout: 60,
     proxy_connect_timeout: 60,
+    bot_detection_enabled: false,
+    bot_detection_type: 'turnstile',
+    recaptcha_version: 'v2',
+    rate_limit_enabled: false,
+    rate_limit_requests: 100,
+    rate_limit_window: 60,
     custom_locations: [],
     custom_headers: {},
   })
@@ -218,6 +224,12 @@ const VHosts = () => {
         max_upload_size: 10,
         proxy_read_timeout: 60,
         proxy_connect_timeout: 60,
+        bot_detection_enabled: false,
+        bot_detection_type: 'turnstile',
+        recaptcha_version: 'v2',
+        rate_limit_enabled: false,
+        rate_limit_requests: 100,
+        rate_limit_window: 60,
         custom_locations: [],
         custom_headers: {},
       })
@@ -317,6 +329,12 @@ const VHosts = () => {
       max_upload_size: vhost.max_upload_size || 10,
       proxy_read_timeout: vhost.proxy_read_timeout || 60,
       proxy_connect_timeout: vhost.proxy_connect_timeout || 60,
+      bot_detection_enabled: vhost.bot_detection_enabled || false,
+      bot_detection_type: vhost.bot_detection_type || 'turnstile',
+      recaptcha_version: vhost.recaptcha_version || 'v2',
+      rate_limit_enabled: vhost.rate_limit_enabled || false,
+      rate_limit_requests: vhost.rate_limit_requests || 100,
+      rate_limit_window: vhost.rate_limit_window || 60,
       custom_locations: vhost.custom_locations || [],
       custom_headers: vhost.custom_headers || {},
     })
@@ -1030,6 +1048,98 @@ const VHosts = () => {
                         onChange={(e) => setFormData({ ...formData, proxy_connect_timeout: Number.parseInt(e.target.value) || 60 })}
                       />
                     </div>
+                  </div>
+
+                  {/* Bot Detection */}
+                  <div className="border-t border-gray-300 pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        type="checkbox"
+                        id="bot_detection"
+                        checked={formData.bot_detection_enabled}
+                        onChange={(e) => setFormData({ ...formData, bot_detection_enabled: e.target.checked })}
+                      />
+                      <label htmlFor="bot_detection" className="text-sm font-medium">Enable Bot Detection</label>
+                    </div>
+                    {formData.bot_detection_enabled && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="label">Challenge Type</label>
+                          <select
+                            className="input"
+                            value={formData.bot_detection_type}
+                            onChange={(e) => setFormData({ ...formData, bot_detection_type: e.target.value })}
+                          >
+                            <option value="turnstile">Cloudflare Turnstile</option>
+                            <option value="captcha">Google reCAPTCHA</option>
+                            <option value="slide_puzzle">Slide Puzzle</option>
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">Show challenge page before allowing access to this vhost</p>
+                        </div>
+                        {formData.bot_detection_type === 'captcha' && (
+                          <div>
+                            <label className="label">reCAPTCHA Version</label>
+                            <select
+                              className="input"
+                              value={formData.recaptcha_version || 'v2'}
+                              onChange={(e) => setFormData({ ...formData, recaptcha_version: e.target.value })}
+                            >
+                              <option value="v2">v2 (Checkbox - "I'm not a robot")</option>
+                              <option value="v3">v3 (Invisible - Score based)</option>
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {formData.recaptcha_version === 'v3' 
+                                ? 'v3: Invisible challenge with automatic scoring (0.0-1.0)'
+                                : 'v2: Visible checkbox with manual verification'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Rate Limiter */}
+                  <div className="border-t border-gray-300 pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        type="checkbox"
+                        id="rate_limit"
+                        checked={formData.rate_limit_enabled}
+                        onChange={(e) => setFormData({ ...formData, rate_limit_enabled: e.target.checked })}
+                      />
+                      <label htmlFor="rate_limit" className="text-sm font-medium">Enable Rate Limiting</label>
+                    </div>
+                    {formData.rate_limit_enabled && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="label">Max Requests</label>
+                          <input
+                            type="number"
+                            className="input"
+                            min="1"
+                            max="10000"
+                            value={formData.rate_limit_requests}
+                            onChange={(e) => setFormData({ ...formData, rate_limit_requests: Number.parseInt(e.target.value) || 100 })}
+                          />
+                        </div>
+                        <div>
+                          <label className="label">Time Window (seconds)</label>
+                          <input
+                            type="number"
+                            className="input"
+                            min="1"
+                            max="3600"
+                            value={formData.rate_limit_window}
+                            onChange={(e) => setFormData({ ...formData, rate_limit_window: Number.parseInt(e.target.value) || 60 })}
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-xs text-gray-500">
+                            Limit: {formData.rate_limit_requests} requests per {formData.rate_limit_window} seconds per IP
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Custom Headers */}
