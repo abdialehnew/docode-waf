@@ -50,14 +50,18 @@ This project is committed to maintaining high security and code quality standard
 
 ### Core Security
 - ✅ **Reverse Proxy** - High-performance reverse proxy with nginx integration
-- ✅ **Rate Limiting** - Configurable rate limiting per IP/endpoint
+- ✅ **Rate Limiting** - Configurable rate limiting per IP/endpoint with per-vhost control
 - ✅ **IP Blocking** - Block by single IP or CIDR blocks
 - ✅ **Geographic Blocking** - Block requests by country (GeoIP2)
 - ✅ **URL Filtering** - Pattern-based URL blocking
 - ✅ **SSL Certificate Management** - Upload and manage SSL certificates per domain
 - ✅ **HTTP Flood Protection** - Protect against DDoS and HTTP flood attacks
-- ✅ **Anti-Bot Detection** - Intelligent bot detection and mitigation
-- ✅ **Cloudflare Turnstile** - CAPTCHA protection for login & registration pages
+- ✅ **Bot Detection (Per-VHost)** - Advanced bot detection with multiple challenge types:
+  - **Cloudflare Turnstile** - Modern CAPTCHA with Force Interactive mode
+  - **Google reCAPTCHA v2** - Traditional checkbox "I'm not a robot"
+  - **Google reCAPTCHA v3** - Invisible score-based verification (0.0-1.0)
+  - **Slide Puzzle** - Custom puzzle challenge
+- ✅ **Rate Limiter (Per-VHost)** - Configurable request limits with beautiful countdown page
 - ✅ **Application Branding** - Custom app name and logo configuration
 
 ### Attack Detection
@@ -77,6 +81,8 @@ This project is committed to maintaining high security and code quality standard
 - 👤 **User Registration** - Self-service account registration
 - 🔒 **Role-Based Access** - Admin and superadmin roles
 - ⚙️ **Advanced VHost Config** - WebSocket, HTTP/2, TLS version, custom headers
+- 🛡️ **Per-VHost Bot Detection** - Enable/disable and configure bot challenges per domain
+- ⏱️ **Per-VHost Rate Limiting** - Set custom rate limits (requests/window) per domain
 - 🎨 **Application Settings** - Configure app name, logo, and branding
 - 📝 **Nginx Config Editor** - Edit vhost configs with syntax highlighting (Monokai theme)
 - 🔄 **Auto-Backup** - Automatic backup before config changes

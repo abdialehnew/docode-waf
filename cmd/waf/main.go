@@ -106,10 +106,10 @@ func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, 
 	wafRouter.Use(gin.Recovery())
 
 	// Apply WAF middleware
-	wafRouter.Use(middleware.RateLimiterMiddleware(redisClient, cfg.WAF.RateLimit.RequestsPerSecond, cfg.WAF.RateLimit.Burst))
+	wafRouter.Use(middleware.RateLimiterMiddleware(redisClient, db))
 	wafRouter.Use(middleware.HTTPFloodProtectionMiddleware(redisClient, cfg.WAF.HTTPFlood.MaxRequestsPerMinute, time.Minute))
 	wafRouter.Use(middleware.IPBlockerMiddleware(db))
-	wafRouter.Use(middleware.BotDetectorMiddleware())
+	wafRouter.Use(middleware.BotDetectorMiddleware(db))
 	wafRouter.Use(middleware.LoggingMiddleware(db))
 
 	// Proxy all requests to the reverse proxy

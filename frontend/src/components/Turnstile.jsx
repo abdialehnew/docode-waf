@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const Turnstile = ({ siteKey, onVerify, onError, onExpire, size = 'normal', theme = 'dark' }) => {
+const Turnstile = ({ siteKey, onVerify, onError, onExpire, size = 'flexible', theme = 'auto' }) => {
   const containerRef = useRef(null);
   const widgetIdRef = useRef(null);
   const scriptLoadedRef = useRef(false);

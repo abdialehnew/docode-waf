@@ -37,9 +37,11 @@ func (h *IPGroupHandler) ListIPGroups(c *gin.Context) {
 	var groups []map[string]interface{}
 
 	query := `
-		SELECT id, name, description, type, created_at, updated_at
-		FROM ip_groups 
-		ORDER BY created_at DESC
+		SELECT ig.id, ig.name, ig.description, ig.type, ig.vhost_id, 
+		       v.domain as vhost_domain, ig.created_at, ig.updated_at
+		FROM ip_groups ig
+		LEFT JOIN vhosts v ON ig.vhost_id = v.id
+		ORDER BY ig.created_at DESC
 	`
 
 	rows, err := h.db.Queryx(query)
@@ -72,9 +74,11 @@ func (h *IPGroupHandler) GetIPGroup(c *gin.Context) {
 
 	group := make(map[string]interface{})
 	query := `
-		SELECT id, name, description, type, created_at, updated_at
-		FROM ip_groups 
-		WHERE id = $1
+		SELECT ig.id, ig.name, ig.description, ig.type, ig.vhost_id,
+		       v.domain as vhost_domain, ig.created_at, ig.updated_at
+		FROM ip_groups ig
+		LEFT JOIN vhosts v ON ig.vhost_id = v.id
+		WHERE ig.id = $1
 	`
 
 	rows, err := h.db.Queryx(query, id)
@@ -123,9 +127,10 @@ func (h *IPGroupHandler) GetIPGroup(c *gin.Context) {
 // CreateIPGroup creates a new IP group
 func (h *IPGroupHandler) CreateIPGroup(c *gin.Context) {
 	var input struct {
-		Name        string `json:"name" binding:"required"`
-		Description string `json:"description"`
-		Type        string `json:"type" binding:"required"` // whitelist or blacklist
+		Name        string  `json:"name" binding:"required"`
+		Description string  `json:"description"`
+		Type        string  `json:"type" binding:"required"` // whitelist or blacklist
+		VhostID     *string `json:"vhost_id"`                // optional, NULL for global rules
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -134,8 +139,8 @@ func (h *IPGroupHandler) CreateIPGroup(c *gin.Context) {
 	}
 
 	query := `
-		INSERT INTO ip_groups (id, name, description, type, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
+		INSERT INTO ip_groups (id, name, description, type, vhost_id, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
 		RETURNING id
 	`
 
@@ -144,6 +149,7 @@ func (h *IPGroupHandler) CreateIPGroup(c *gin.Context) {
 		input.Name,
 		input.Description,
 		input.Type,
+		input.VhostID,
 		time.Now(),
 		time.Now(),
 	).Scan(&id)
@@ -166,9 +172,10 @@ func (h *IPGroupHandler) UpdateIPGroup(c *gin.Context) {
 	}
 
 	var input struct {
-		Name        string `json:"name" binding:"required"`
-		Description string `json:"description"`
-		Type        string `json:"type" binding:"required"`
+		Name        string  `json:"name" binding:"required"`
+		Description string  `json:"description"`
+		Type        string  `json:"type" binding:"required"`
+		VhostID     *string `json:"vhost_id"` // optional, NULL for global rules
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -178,14 +185,15 @@ func (h *IPGroupHandler) UpdateIPGroup(c *gin.Context) {
 
 	query := `
 		UPDATE ip_groups 
-		SET name = $1, description = $2, type = $3, updated_at = $4
-		WHERE id = $5
+		SET name = $1, description = $2, type = $3, vhost_id = $4, updated_at = $5
+		WHERE id = $6
 	`
 
 	_, err = h.db.Exec(query,
 		input.Name,
 		input.Description,
 		input.Type,
+		input.VhostID,
 		time.Now(),
 		id,
 	)

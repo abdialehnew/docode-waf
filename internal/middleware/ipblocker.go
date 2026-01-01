@@ -30,22 +30,29 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 			}
 		}
 
-		// Debug logging
-		log.Printf("[IP Blocker] Client IP: %s, X-Forwarded-For: %s, X-Real-IP: %s, RemoteAddr: %s",
-			clientIP, xForwardedFor, xRealIP, c.Request.RemoteAddr)
+		// Get current vhost domain
+		domain := c.Request.Host
+		// Remove port if present
+		if colonIdx := strings.Index(domain, ":"); colonIdx != -1 {
+			domain = domain[:colonIdx]
+		}
 
-		// Check whitelist first
-		whitelisted, err := isIPInGroup(db, clientIP, "whitelist")
+		// Debug logging
+		log.Printf("[IP Blocker] Client IP: %s, Domain: %s, X-Forwarded-For: %s, X-Real-IP: %s, RemoteAddr: %s",
+			clientIP, domain, xForwardedFor, xRealIP, c.Request.RemoteAddr)
+
+		// Check whitelist first (both global and vhost-specific)
+		whitelisted, err := isIPInGroup(db, clientIP, domain, "whitelist")
 		if err == nil && whitelisted {
-			log.Printf("[IP Blocker] IP %s is whitelisted", clientIP)
+			log.Printf("[IP Blocker] IP %s is whitelisted for domain %s", clientIP, domain)
 			c.Next()
 			return
 		}
 
-		// Check blacklist
-		blacklisted, err := isIPInGroup(db, clientIP, "blacklist")
+		// Check blacklist (both global and vhost-specific)
+		blacklisted, err := isIPInGroup(db, clientIP, domain, "blacklist")
 		if err == nil && blacklisted {
-			log.Printf("[IP Blocker] IP %s is blacklisted - blocking request", clientIP)
+			log.Printf("[IP Blocker] IP %s is blacklisted for domain %s - blocking request", clientIP, domain)
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.String(http.StatusForbidden, getBlockedPageHTML(db, clientIP, c.Request.Host))
 			c.Abort()
@@ -66,12 +73,15 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 	}
 }
 
-func isIPInGroup(db *sqlx.DB, clientIP, groupType string) (bool, error) {
+func isIPInGroup(db *sqlx.DB, clientIP, domain, groupType string) (bool, error) {
+	// Check both global rules (vhost_id IS NULL) and vhost-specific rules
 	query := `
 		SELECT ia.ip_address, ia.cidr_mask 
 		FROM ip_addresses ia
 		JOIN ip_groups ig ON ia.group_id = ig.id
-		WHERE ig.type = $1
+		LEFT JOIN vhosts v ON ig.vhost_id = v.id
+		WHERE ig.type = $1 
+		AND (ig.vhost_id IS NULL OR v.domain = $2)
 	`
 
 	var addresses []struct {
@@ -79,13 +89,13 @@ func isIPInGroup(db *sqlx.DB, clientIP, groupType string) (bool, error) {
 		CIDRMask  *int   `db:"cidr_mask"`
 	}
 
-	err := db.Select(&addresses, query, groupType)
+	err := db.Select(&addresses, query, groupType, domain)
 	if err != nil {
-		log.Printf("[IP Blocker] Error querying %s: %v", groupType, err)
+		log.Printf("[IP Blocker] Error querying %s for domain %s: %v", groupType, domain, err)
 		return false, err
 	}
 
-	log.Printf("[IP Blocker] Checking client IP %s against %d %s entries", clientIP, len(addresses), groupType)
+	log.Printf("[IP Blocker] Checking client IP %s against %d %s entries for domain %s", clientIP, len(addresses), groupType, domain)
 
 	clientIPParsed := net.ParseIP(clientIP)
 	if clientIPParsed == nil {
@@ -216,7 +226,7 @@ func getBlockedPageHTML(db *sqlx.DB, clientIP, host string) string {
             background: white;
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 600px;
+            max-width: 1200px;
             width: 100%;
             padding: 40px;
             text-align: center;
@@ -270,8 +280,9 @@ func getBlockedPageHTML(db *sqlx.DB, clientIP, host string) string {
             border: 2px solid #e2e8f0;
             border-radius: 10px;
             padding: 15px;
-            margin: 25px 0;
+            margin: 25px auto;
             display: inline-block;
+            max-width: 300px;
         }
         
         .ip-label {
@@ -286,13 +297,19 @@ func getBlockedPageHTML(db *sqlx.DB, clientIP, host string) string {
             font-weight: 600;
             font-family: 'Courier New', monospace;
         }
+
+        .info-boxes {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 25px 0;
+            text-align: left;
+        }
         
         .message-box {
             background: #fff5f5;
             border-left: 4px solid #f56565;
             padding: 20px;
-            margin: 25px 0;
-            text-align: left;
             border-radius: 8px;
         }
         
@@ -321,8 +338,6 @@ func getBlockedPageHTML(db *sqlx.DB, clientIP, host string) string {
             background: #ebf8ff;
             border-left: 4px solid #4299e1;
             padding: 20px;
-            margin: 25px 0;
-            text-align: left;
             border-radius: 8px;
         }
         
@@ -381,6 +396,10 @@ func getBlockedPageHTML(db *sqlx.DB, clientIP, host string) string {
             .subtitle {
                 font-size: 16px;
             }
+
+            .info-boxes {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -400,31 +419,33 @@ func getBlockedPageHTML(db *sqlx.DB, clientIP, host string) string {
             <div class="ip-address">` + clientIP + `</div>
         </div>
         
-        <div class="message-box">
-            <h3>
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-                </svg>
-                Why am I seeing this?
-            </h3>
-            <p>Your IP address is currently on our <strong>blacklist</strong> due to security policies or suspicious activity detected from your network.</p>
-            <p>Access to this resource has been restricted to protect our systems and other users.</p>
-        </div>
-        
-        <div class="contact-box">
-            <h3>
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
-                </svg>
-                Need Access?
-            </h3>
-            <p>If you believe this is a mistake or you need access to this resource, please contact your <strong>System Administrator</strong> with the following information:</p>
-            <ul>
-                <li>Your IP address: <strong>` + clientIP + `</strong></li>
-                <li>Date and time of access attempt</li>
-                <li>Reason for access request</li>
-            </ul>
-            <p style="margin-top: 15px;">The System Administrator can review your request and move your IP from the blacklist to the whitelist if approved.</p>
+        <div class="info-boxes">
+            <div class="message-box">
+                <h3>
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                    Why am I seeing this?
+                </h3>
+                <p>Your IP address is currently on our <strong>blacklist</strong> due to security policies or suspicious activity detected from your network.</p>
+                <p>Access to this resource has been restricted to protect our systems and other users.</p>
+            </div>
+            
+            <div class="contact-box">
+                <h3>
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                    </svg>
+                    Need Access?
+                </h3>
+                <p>If you believe this is a mistake or you need access to this resource, please contact your <strong>System Administrator</strong> with the following information:</p>
+                <ul>
+                    <li>Your IP address: <strong>` + clientIP + `</strong></li>
+                    <li>Date and time of access attempt</li>
+                    <li>Reason for access request</li>
+                </ul>
+                <p style="margin-top: 15px;">The System Administrator can review your request and move your IP from the blacklist to the whitelist if approved.</p>
+            </div>
         </div>
         
         <div class="footer">
