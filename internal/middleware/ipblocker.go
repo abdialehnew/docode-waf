@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -47,16 +48,46 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 
 func isIPInGroup(db *sqlx.DB, clientIP, groupType string) (bool, error) {
 	query := `
-		SELECT COUNT(*) FROM ip_addresses ia
+		SELECT ia.ip_address, ia.cidr_mask 
+		FROM ip_addresses ia
 		JOIN ip_groups ig ON ia.group_id = ig.id
-		WHERE ig.type = $1 AND ia.ip_address = $2
+		WHERE ig.type = $1
 	`
-	var count int
-	err := db.Get(&count, query, groupType, clientIP)
+
+	var addresses []struct {
+		IPAddress string `db:"ip_address"`
+		CIDRMask  *int   `db:"cidr_mask"`
+	}
+
+	err := db.Select(&addresses, query, groupType)
 	if err != nil {
 		return false, err
 	}
-	return count > 0, nil
+
+	clientIPParsed := net.ParseIP(clientIP)
+	if clientIPParsed == nil {
+		return false, nil
+	}
+
+	for _, addr := range addresses {
+		// Check if CIDR is specified
+		if addr.CIDRMask != nil && *addr.CIDRMask > 0 {
+			// Build CIDR notation
+			cidr := fmt.Sprintf("%s/%d", addr.IPAddress, *addr.CIDRMask)
+
+			_, ipNet, err := net.ParseCIDR(cidr)
+			if err == nil && ipNet.Contains(clientIPParsed) {
+				return true, nil
+			}
+		} else {
+			// Exact IP match
+			if addr.IPAddress == clientIP {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func checkBlockingRules(db *sqlx.DB, c *gin.Context) (bool, string) {
