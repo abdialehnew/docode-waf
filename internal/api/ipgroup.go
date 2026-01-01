@@ -156,6 +156,48 @@ func (h *IPGroupHandler) CreateIPGroup(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": id, "message": "IP Group created successfully"})
 }
 
+// UpdateIPGroup updates an existing IP group
+func (h *IPGroupHandler) UpdateIPGroup(c *gin.Context) {
+	encodedID := c.Param("id")
+	id, err := decodeID(encodedID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
+
+	var input struct {
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description"`
+		Type        string `json:"type" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	query := `
+		UPDATE ip_groups 
+		SET name = $1, description = $2, type = $3, updated_at = $4
+		WHERE id = $5
+	`
+
+	_, err = h.db.Exec(query,
+		input.Name,
+		input.Description,
+		input.Type,
+		time.Now(),
+		id,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "IP Group updated successfully"})
+}
+
 // AddIPAddress adds an IP address to a group
 func (h *IPGroupHandler) AddIPAddress(c *gin.Context) {
 	encodedGroupID := c.Param("id")
@@ -197,6 +239,47 @@ func (h *IPGroupHandler) AddIPAddress(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"id": id, "message": "IP Address added successfully"})
+}
+
+// UpdateIPAddress updates an existing IP address
+func (h *IPGroupHandler) UpdateIPAddress(c *gin.Context) {
+	encodedAddressID := c.Param("addressId")
+	addressID, err := decodeID(encodedAddressID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address ID format"})
+		return
+	}
+
+	var input struct {
+		IPAddress   string `json:"ip_address" binding:"required"`
+		CIDRMask    *int   `json:"cidr_mask"`
+		Description string `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	query := `
+		UPDATE ip_addresses 
+		SET ip_address = $1, cidr_mask = $2, description = $3
+		WHERE id = $4
+	`
+
+	_, err = h.db.Exec(query,
+		input.IPAddress,
+		input.CIDRMask,
+		input.Description,
+		addressID,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "IP Address updated successfully"})
 }
 
 // GetIPAddresses returns all IP addresses for a specific group

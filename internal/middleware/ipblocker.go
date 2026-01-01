@@ -47,7 +47,7 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 		if err == nil && blacklisted {
 			log.Printf("[IP Blocker] IP %s is blacklisted - blocking request", clientIP)
 			c.Header("Content-Type", "text/html; charset=utf-8")
-			c.String(http.StatusForbidden, getBlockedPageHTML(clientIP))
+			c.String(http.StatusForbidden, getBlockedPageHTML(db, clientIP, c.Request.Host))
 			c.Abort()
 			return
 		}
@@ -181,7 +181,14 @@ func matchIP(ip, pattern string) bool {
 }
 
 // getBlockedPageHTML returns a styled HTML page for blocked users
-func getBlockedPageHTML(clientIP string) string {
+func getBlockedPageHTML(db *sqlx.DB, clientIP, host string) string {
+	// Get application name from vhost
+	// var appName string
+	// query := "SELECT name FROM vhosts WHERE domain = $1 LIMIT 1"
+	// err := db.Get(&appName, query, host)
+	// if err != nil || appName == "" {
+	// 	appName = "Web Application Firewall"
+	// }
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -197,7 +204,7 @@ func getBlockedPageHTML(clientIP string) string {
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #bf6715ff 0%, #991b1b 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -231,12 +238,12 @@ func getBlockedPageHTML(clientIP string) string {
             width: 100px;
             height: 100px;
             margin: 0 auto 30px;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 10px 30px rgba(245, 87, 108, 0.3);
+            box-shadow: 0 10px 30px rgba(220, 38, 38, 0.4);
         }
         
         .icon svg {
@@ -421,7 +428,7 @@ func getBlockedPageHTML(clientIP string) string {
         </div>
         
         <div class="footer">
-            <p>Protected by WAF (Web Application Firewall)</p>
+            <p>Protected by DoCode WAF (Web Application Firewall)</p>
         </div>
     </div>
 </body>

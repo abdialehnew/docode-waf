@@ -189,9 +189,11 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		protected.GET("/ip-groups", ipGroupHandler.ListIPGroups)
 		protected.GET("/ip-groups/:id", ipGroupHandler.GetIPGroup)
 		protected.POST("/ip-groups", ipGroupHandler.CreateIPGroup)
+		protected.PUT("/ip-groups/:id", ipGroupHandler.UpdateIPGroup)
 		protected.DELETE("/ip-groups/:id", ipGroupHandler.DeleteIPGroup)
 		protected.GET("/ip-groups/:id/addresses", ipGroupHandler.GetIPAddresses)
 		protected.POST("/ip-groups/:id/addresses", ipGroupHandler.AddIPAddress)
+		protected.PUT("/ip-groups/:id/addresses/:addressId", ipGroupHandler.UpdateIPAddress)
 		protected.DELETE("/ip-groups/:id/addresses/:addressId", ipGroupHandler.DeleteIPAddress)
 
 		// SSL Certificates
