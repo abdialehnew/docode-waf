@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"net/http"
 	"time"
 
@@ -16,6 +17,19 @@ type IPGroupHandler struct {
 // NewIPGroupHandler creates a new IP group handler
 func NewIPGroupHandler(db *sqlx.DB) *IPGroupHandler {
 	return &IPGroupHandler{db: db}
+}
+
+// decodeID decodes a base64-encoded ID to the original UUID string
+func decodeID(encodedID string) (string, error) {
+	decoded, err := base64.URLEncoding.DecodeString(encodedID)
+	if err != nil {
+		// Try standard encoding if URL encoding fails
+		decoded, err = base64.StdEncoding.DecodeString(encodedID)
+		if err != nil {
+			return "", err
+		}
+	}
+	return string(decoded), nil
 }
 
 // ListIPGroups returns all IP groups
@@ -49,7 +63,12 @@ func (h *IPGroupHandler) ListIPGroups(c *gin.Context) {
 
 // GetIPGroup returns a specific IP group with its addresses
 func (h *IPGroupHandler) GetIPGroup(c *gin.Context) {
-	id := c.Param("id")
+	encodedID := c.Param("id")
+	id, err := decodeID(encodedID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
 
 	group := make(map[string]interface{})
 	query := `
@@ -139,7 +158,12 @@ func (h *IPGroupHandler) CreateIPGroup(c *gin.Context) {
 
 // AddIPAddress adds an IP address to a group
 func (h *IPGroupHandler) AddIPAddress(c *gin.Context) {
-	groupID := c.Param("id")
+	encodedGroupID := c.Param("id")
+	groupID, err := decodeID(encodedGroupID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID format"})
+		return
+	}
 
 	var input struct {
 		IPAddress   string `json:"ip_address" binding:"required"`
@@ -159,7 +183,7 @@ func (h *IPGroupHandler) AddIPAddress(c *gin.Context) {
 	`
 
 	var id string
-	err := h.db.QueryRow(query,
+	err = h.db.QueryRow(query,
 		groupID,
 		input.IPAddress,
 		input.CIDRMask,
@@ -175,11 +199,57 @@ func (h *IPGroupHandler) AddIPAddress(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": id, "message": "IP Address added successfully"})
 }
 
+// GetIPAddresses returns all IP addresses for a specific group
+func (h *IPGroupHandler) GetIPAddresses(c *gin.Context) {
+	encodedGroupID := c.Param("id")
+	groupID, err := decodeID(encodedGroupID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID format"})
+		return
+	}
+
+	var addresses []map[string]interface{}
+	query := `
+		SELECT id, ip_address, cidr_mask, description, created_at
+		FROM ip_addresses 
+		WHERE group_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := h.db.Queryx(query, groupID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		addr := make(map[string]interface{})
+		err := rows.MapScan(addr)
+		if err != nil {
+			continue
+		}
+		addresses = append(addresses, addr)
+	}
+
+	// Return empty array instead of null
+	if addresses == nil {
+		addresses = []map[string]interface{}{}
+	}
+
+	c.JSON(http.StatusOK, addresses)
+}
+
 // DeleteIPAddress removes an IP address from a group
 func (h *IPGroupHandler) DeleteIPAddress(c *gin.Context) {
-	addressID := c.Param("addressId")
+	encodedAddressID := c.Param("addressId")
+	addressID, err := decodeID(encodedAddressID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address ID format"})
+		return
+	}
 
-	_, err := h.db.Exec("DELETE FROM ip_addresses WHERE id = $1", addressID)
+	_, err = h.db.Exec("DELETE FROM ip_addresses WHERE id = $1", addressID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -190,10 +260,15 @@ func (h *IPGroupHandler) DeleteIPAddress(c *gin.Context) {
 
 // DeleteIPGroup deletes an IP group
 func (h *IPGroupHandler) DeleteIPGroup(c *gin.Context) {
-	id := c.Param("id")
+	encodedID := c.Param("id")
+	id, err := decodeID(encodedID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
 
 	// Delete all addresses in the group first
-	_, err := h.db.Exec("DELETE FROM ip_addresses WHERE group_id = $1", id)
+	_, err = h.db.Exec("DELETE FROM ip_addresses WHERE group_id = $1", id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

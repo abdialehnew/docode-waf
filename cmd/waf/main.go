@@ -190,6 +190,7 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		protected.GET("/ip-groups/:id", ipGroupHandler.GetIPGroup)
 		protected.POST("/ip-groups", ipGroupHandler.CreateIPGroup)
 		protected.DELETE("/ip-groups/:id", ipGroupHandler.DeleteIPGroup)
+		protected.GET("/ip-groups/:id/addresses", ipGroupHandler.GetIPAddresses)
 		protected.POST("/ip-groups/:id/addresses", ipGroupHandler.AddIPAddress)
 		protected.DELETE("/ip-groups/:id/addresses/:addressId", ipGroupHandler.DeleteIPAddress)
 
