@@ -107,7 +107,7 @@ server {
         limit_req zone=api burst=200 nodelay;
         limit_req_status 429;
         
-        proxy_pass {{.BackendURL}};
+        proxy_pass http://waf:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -146,12 +146,12 @@ server {
         {{end}}{{if .CustomConfig}}{{.CustomConfig}}{{end}}
     }
 {{end}}
-    # Proxy to Backend - Main Location
+    # Proxy to WAF - All requests go through WAF middleware first
     location / {
         # Rate limiting
         limit_req zone=general burst=100 nodelay;
         
-        proxy_pass {{.BackendURL}};
+        proxy_pass http://waf:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
