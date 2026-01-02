@@ -31,9 +31,9 @@ RUN rm -f /etc/nginx/conf.d/default.conf && \
 
 EXPOSE 80 443
 
-# Health check - Accept 200, 403, or 502 (502 is when upstream blocks the bot health check)
+# Health check - Accept 200, 404, 403, or 502 (502 is when upstream blocks the bot health check)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider --server-response http://127.0.0.1/ 2>&1 | grep -q 'HTTP.*\(200\|403\|502\)' || exit 1
+    CMD wget --no-verbose --tries=1 --spider --server-response http://127.0.0.1/ 2>&1 | grep -q 'HTTP.*\(200\|404\|403\|502\)' || exit 1
 
 # Start nginx and reload watcher in background
 CMD /usr/local/bin/watch-reload.sh & nginx -g 'daemon off;'

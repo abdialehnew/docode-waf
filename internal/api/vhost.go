@@ -14,20 +14,26 @@ import (
 )
 
 // VHostHandler handles virtual host requests
+type ProxyReloader interface {
+	ReloadVHosts() error
+}
+
 type VHostHandler struct {
 	db                 *sqlx.DB
 	nginxConfigService *services.NginxConfigService
 	vhostService       *services.VHostService
 	certService        *services.CertificateService
+	proxyReloader      ProxyReloader
 }
 
 // NewVHostHandler creates a new vhost handler
-func NewVHostHandler(db *sqlx.DB, nginxConfigService *services.NginxConfigService, vhostService *services.VHostService, certService *services.CertificateService) *VHostHandler {
+func NewVHostHandler(db *sqlx.DB, nginxConfigService *services.NginxConfigService, vhostService *services.VHostService, certService *services.CertificateService, proxyReloader ProxyReloader) *VHostHandler {
 	return &VHostHandler{
 		db:                 db,
 		nginxConfigService: nginxConfigService,
 		vhostService:       vhostService,
 		certService:        certService,
+		proxyReloader:      proxyReloader,
 	}
 }
 
@@ -276,6 +282,9 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	if input.BotDetectionType == "" {
 		input.BotDetectionType = "turnstile"
 	}
+	if input.RecaptchaVersion == "" {
+		input.RecaptchaVersion = "v2"
+	}
 	if input.RateLimitRequests == 0 {
 		input.RateLimitRequests = 100
 	}
@@ -384,6 +393,13 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 
 	// Reload nginx
 	h.reloadNginx()
+
+	// Reload proxy map to include new vhost
+	if h.proxyReloader != nil {
+		if err := h.proxyReloader.ReloadVHosts(); err != nil {
+			fmt.Printf("Warning: Failed to reload proxy map: %v\n", err)
+		}
+	}
 
 	c.JSON(http.StatusCreated, gin.H{"id": id, "message": "VHost created successfully"})
 }
@@ -547,6 +563,13 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	// Reload nginx
 	h.reloadNginx()
 
+	// Reload proxy map
+	if h.proxyReloader != nil {
+		if err := h.proxyReloader.ReloadVHosts(); err != nil {
+			fmt.Printf("Warning: Failed to reload proxy map: %v\n", err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "VHost updated successfully"})
 }
 
@@ -594,6 +617,13 @@ func (h *VHostHandler) DeleteVHost(c *gin.Context) {
 
 	// Reload nginx
 	h.reloadNginx()
+
+	// Reload proxy map
+	if h.proxyReloader != nil {
+		if err := h.proxyReloader.ReloadVHosts(); err != nil {
+			fmt.Printf("Warning: Failed to reload proxy map: %v\n", err)
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "VHost deleted successfully"})
 }

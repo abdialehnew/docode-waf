@@ -88,8 +88,8 @@ server {
     access_log /var/log/nginx/{{.Domain}}_access.log;
     error_log /var/log/nginx/{{.Domain}}_error.log warn;
     
-    # Security: Deny access to hidden files
-    location ~ /\. {
+    # Security: Deny access to hidden files (except .well-known and .vite for dev)
+    location ~ /\.(?!well-known|vite) {
         deny all;
         access_log off;
         log_not_found off;
