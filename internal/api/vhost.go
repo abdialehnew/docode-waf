@@ -11,6 +11,7 @@ import (
 	"github.com/aleh/docode-waf/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // VHostHandler handles virtual host requests
@@ -240,28 +241,31 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 // CreateVHost creates a new virtual host
 func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	var input struct {
-		Name                string                 `json:"name" binding:"required"`
-		Domain              string                 `json:"domain" binding:"required"`
-		BackendURL          string                 `json:"backend_url" binding:"required"`
-		SSLEnabled          bool                   `json:"ssl_enabled"`
-		SSLCertificateID    *string                `json:"ssl_certificate_id"`
-		SSLCertPath         string                 `json:"ssl_cert_path"`
-		SSLKeyPath          string                 `json:"ssl_key_path"`
-		Enabled             bool                   `json:"enabled"`
-		WebsocketEnabled    bool                   `json:"websocket_enabled"`
-		HTTPVersion         string                 `json:"http_version"`
-		TLSVersion          string                 `json:"tls_version"`
-		MaxUploadSize       int                    `json:"max_upload_size"`
-		ProxyReadTimeout    int                    `json:"proxy_read_timeout"`
-		ProxyConnectTimeout int                    `json:"proxy_connect_timeout"`
-		BotDetectionEnabled bool                   `json:"bot_detection_enabled"`
-		BotDetectionType    string                 `json:"bot_detection_type"`
-		RecaptchaVersion    string                 `json:"recaptcha_version"`
-		RateLimitEnabled    bool                   `json:"rate_limit_enabled"`
-		RateLimitRequests   int                    `json:"rate_limit_requests"`
-		RateLimitWindow     int                    `json:"rate_limit_window"`
-		CustomHeaders       map[string]interface{} `json:"custom_headers"`
-		CustomLocations     []map[string]string    `json:"custom_locations"`
+		Name                   string                 `json:"name" binding:"required"`
+		Domain                 string                 `json:"domain" binding:"required"`
+		BackendURL             string                 `json:"backend_url" binding:"required"`
+		SSLEnabled             bool                   `json:"ssl_enabled"`
+		SSLCertificateID       *string                `json:"ssl_certificate_id"`
+		SSLCertPath            string                 `json:"ssl_cert_path"`
+		SSLKeyPath             string                 `json:"ssl_key_path"`
+		Enabled                bool                   `json:"enabled"`
+		WebsocketEnabled       bool                   `json:"websocket_enabled"`
+		HTTPVersion            string                 `json:"http_version"`
+		TLSVersion             string                 `json:"tls_version"`
+		MaxUploadSize          int                    `json:"max_upload_size"`
+		ProxyReadTimeout       int                    `json:"proxy_read_timeout"`
+		ProxyConnectTimeout    int                    `json:"proxy_connect_timeout"`
+		BotDetectionEnabled    bool                   `json:"bot_detection_enabled"`
+		BotDetectionType       string                 `json:"bot_detection_type"`
+		RecaptchaVersion       string                 `json:"recaptcha_version"`
+		RateLimitEnabled       bool                   `json:"rate_limit_enabled"`
+		RateLimitRequests      int                    `json:"rate_limit_requests"`
+		RateLimitWindow        int                    `json:"rate_limit_window"`
+		RegionWhitelist        []string               `json:"region_whitelist"`
+		RegionBlacklist        []string               `json:"region_blacklist"`
+		RegionFilteringEnabled bool                   `json:"region_filtering_enabled"`
+		CustomHeaders          map[string]interface{} `json:"custom_headers"`
+		CustomLocations        []map[string]string    `json:"custom_locations"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -309,8 +313,9 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		                   proxy_read_timeout, proxy_connect_timeout,
 		                   bot_detection_enabled, bot_detection_type, recaptcha_version,
 		                   rate_limit_enabled, rate_limit_requests, rate_limit_window,
+		                   region_whitelist, region_blacklist, region_filtering_enabled,
 		                   custom_headers, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
 		RETURNING id
 	`
 
@@ -336,6 +341,9 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		input.RateLimitEnabled,
 		input.RateLimitRequests,
 		input.RateLimitWindow,
+		pq.Array(input.RegionWhitelist),
+		pq.Array(input.RegionBlacklist),
+		input.RegionFilteringEnabled,
 		customHeadersJSON,
 		time.Now(),
 		time.Now(),
@@ -409,28 +417,31 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	id := c.Param("id")
 
 	var input struct {
-		Name                string                 `json:"name"`
-		Domain              string                 `json:"domain"`
-		BackendURL          string                 `json:"backend_url"`
-		SSLEnabled          bool                   `json:"ssl_enabled"`
-		SSLCertificateID    *string                `json:"ssl_certificate_id"`
-		SSLCertPath         string                 `json:"ssl_cert_path"`
-		SSLKeyPath          string                 `json:"ssl_key_path"`
-		Enabled             bool                   `json:"enabled"`
-		WebsocketEnabled    bool                   `json:"websocket_enabled"`
-		HTTPVersion         string                 `json:"http_version"`
-		TLSVersion          string                 `json:"tls_version"`
-		MaxUploadSize       int                    `json:"max_upload_size"`
-		ProxyReadTimeout    int                    `json:"proxy_read_timeout"`
-		ProxyConnectTimeout int                    `json:"proxy_connect_timeout"`
-		BotDetectionEnabled bool                   `json:"bot_detection_enabled"`
-		BotDetectionType    string                 `json:"bot_detection_type"`
-		RecaptchaVersion    string                 `json:"recaptcha_version"`
-		RateLimitEnabled    bool                   `json:"rate_limit_enabled"`
-		RateLimitRequests   int                    `json:"rate_limit_requests"`
-		RateLimitWindow     int                    `json:"rate_limit_window"`
-		CustomHeaders       map[string]interface{} `json:"custom_headers"`
-		CustomLocations     []map[string]string    `json:"custom_locations"`
+		Name                   string                 `json:"name"`
+		Domain                 string                 `json:"domain"`
+		BackendURL             string                 `json:"backend_url"`
+		SSLEnabled             bool                   `json:"ssl_enabled"`
+		SSLCertificateID       *string                `json:"ssl_certificate_id"`
+		SSLCertPath            string                 `json:"ssl_cert_path"`
+		SSLKeyPath             string                 `json:"ssl_key_path"`
+		Enabled                bool                   `json:"enabled"`
+		WebsocketEnabled       bool                   `json:"websocket_enabled"`
+		HTTPVersion            string                 `json:"http_version"`
+		TLSVersion             string                 `json:"tls_version"`
+		MaxUploadSize          int                    `json:"max_upload_size"`
+		ProxyReadTimeout       int                    `json:"proxy_read_timeout"`
+		ProxyConnectTimeout    int                    `json:"proxy_connect_timeout"`
+		BotDetectionEnabled    bool                   `json:"bot_detection_enabled"`
+		BotDetectionType       string                 `json:"bot_detection_type"`
+		RecaptchaVersion       string                 `json:"recaptcha_version"`
+		RateLimitEnabled       bool                   `json:"rate_limit_enabled"`
+		RateLimitRequests      int                    `json:"rate_limit_requests"`
+		RateLimitWindow        int                    `json:"rate_limit_window"`
+		RegionWhitelist        []string               `json:"region_whitelist"`
+		RegionBlacklist        []string               `json:"region_blacklist"`
+		RegionFilteringEnabled bool                   `json:"region_filtering_enabled"`
+		CustomHeaders          map[string]interface{} `json:"custom_headers"`
+		CustomLocations        []map[string]string    `json:"custom_locations"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -446,8 +457,9 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		    proxy_read_timeout = $13, proxy_connect_timeout = $14,
 		    bot_detection_enabled = $15, bot_detection_type = $16, recaptcha_version = $17,
 		    rate_limit_enabled = $18, rate_limit_requests = $19, rate_limit_window = $20,
-		    custom_headers = $21, updated_at = $22
-		WHERE id = $23
+		    region_whitelist = $21, region_blacklist = $22, region_filtering_enabled = $23,
+		    custom_headers = $24, updated_at = $25
+		WHERE id = $26
 	`
 
 	// Set defaults
@@ -495,6 +507,9 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		input.RateLimitEnabled,
 		input.RateLimitRequests,
 		input.RateLimitWindow,
+		pq.Array(input.RegionWhitelist),
+		pq.Array(input.RegionBlacklist),
+		input.RegionFilteringEnabled,
 		customHeadersJSON,
 		time.Now(),
 		id,

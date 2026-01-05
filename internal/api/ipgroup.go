@@ -37,10 +37,14 @@ func (h *IPGroupHandler) ListIPGroups(c *gin.Context) {
 	var groups []map[string]interface{}
 
 	query := `
-		SELECT ig.id, ig.name, ig.description, ig.type, ig.vhost_id, 
-		       v.domain as vhost_domain, ig.created_at, ig.updated_at
+		SELECT ig.id, ig.name, ig.description, ig.type,
+		       COALESCE(array_agg(DISTINCT igv.vhost_id) FILTER (WHERE igv.vhost_id IS NOT NULL), '{}') as vhost_ids,
+		       COALESCE(array_agg(DISTINCT v.domain) FILTER (WHERE v.domain IS NOT NULL), '{}') as vhost_domains,
+		       ig.created_at, ig.updated_at
 		FROM ip_groups ig
-		LEFT JOIN vhosts v ON ig.vhost_id = v.id
+		LEFT JOIN ip_group_vhosts igv ON ig.id = igv.ip_group_id
+		LEFT JOIN vhosts v ON igv.vhost_id = v.id
+		GROUP BY ig.id, ig.name, ig.description, ig.type, ig.created_at, ig.updated_at
 		ORDER BY ig.created_at DESC
 	`
 
@@ -74,11 +78,15 @@ func (h *IPGroupHandler) GetIPGroup(c *gin.Context) {
 
 	group := make(map[string]interface{})
 	query := `
-		SELECT ig.id, ig.name, ig.description, ig.type, ig.vhost_id,
-		       v.domain as vhost_domain, ig.created_at, ig.updated_at
+		SELECT ig.id, ig.name, ig.description, ig.type,
+		       COALESCE(array_agg(DISTINCT igv.vhost_id) FILTER (WHERE igv.vhost_id IS NOT NULL), '{}') as vhost_ids,
+		       COALESCE(array_agg(DISTINCT v.domain) FILTER (WHERE v.domain IS NOT NULL), '{}') as vhost_domains,
+		       ig.created_at, ig.updated_at
 		FROM ip_groups ig
-		LEFT JOIN vhosts v ON ig.vhost_id = v.id
+		LEFT JOIN ip_group_vhosts igv ON ig.id = igv.ip_group_id
+		LEFT JOIN vhosts v ON igv.vhost_id = v.id
 		WHERE ig.id = $1
+		GROUP BY ig.id, ig.name, ig.description, ig.type, ig.created_at, ig.updated_at
 	`
 
 	rows, err := h.db.Queryx(query, id)
@@ -127,10 +135,10 @@ func (h *IPGroupHandler) GetIPGroup(c *gin.Context) {
 // CreateIPGroup creates a new IP group
 func (h *IPGroupHandler) CreateIPGroup(c *gin.Context) {
 	var input struct {
-		Name        string  `json:"name" binding:"required"`
-		Description string  `json:"description"`
-		Type        string  `json:"type" binding:"required"` // whitelist or blacklist
-		VhostID     *string `json:"vhost_id"`                // optional, NULL for global rules
+		Name        string   `json:"name" binding:"required"`
+		Description string   `json:"description"`
+		Type        string   `json:"type" binding:"required"` // whitelist or blacklist
+		VhostIDs    []string `json:"vhost_ids"`               // array of vhost IDs, empty for global rules
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -138,23 +146,54 @@ func (h *IPGroupHandler) CreateIPGroup(c *gin.Context) {
 		return
 	}
 
+	// Start transaction
+	tx, err := h.db.Beginx()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer tx.Rollback()
+
+	// Create IP group
 	query := `
-		INSERT INTO ip_groups (id, name, description, type, vhost_id, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
+		INSERT INTO ip_groups (id, name, description, type, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
 		RETURNING id
 	`
 
 	var id string
-	err := h.db.QueryRow(query,
+	err = tx.QueryRow(query,
 		input.Name,
 		input.Description,
 		input.Type,
-		input.VhostID,
 		time.Now(),
 		time.Now(),
 	).Scan(&id)
 
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Insert vhost associations
+	if len(input.VhostIDs) > 0 {
+		for _, vhostID := range input.VhostIDs {
+			if vhostID != "" {
+				_, err = tx.Exec(`
+					INSERT INTO ip_group_vhosts (ip_group_id, vhost_id)
+					VALUES ($1, $2)
+					ON CONFLICT (ip_group_id, vhost_id) DO NOTHING
+				`, id, vhostID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+			}
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -172,10 +211,10 @@ func (h *IPGroupHandler) UpdateIPGroup(c *gin.Context) {
 	}
 
 	var input struct {
-		Name        string  `json:"name" binding:"required"`
-		Description string  `json:"description"`
-		Type        string  `json:"type" binding:"required"`
-		VhostID     *string `json:"vhost_id"` // optional, NULL for global rules
+		Name        string   `json:"name" binding:"required"`
+		Description string   `json:"description"`
+		Type        string   `json:"type" binding:"required"`
+		VhostIDs    []string `json:"vhost_ids"` // array of vhost IDs, empty for global rules
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -183,22 +222,60 @@ func (h *IPGroupHandler) UpdateIPGroup(c *gin.Context) {
 		return
 	}
 
+	// Start transaction
+	tx, err := h.db.Beginx()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer tx.Rollback()
+
+	// Update IP group
 	query := `
 		UPDATE ip_groups 
-		SET name = $1, description = $2, type = $3, vhost_id = $4, updated_at = $5
-		WHERE id = $6
+		SET name = $1, description = $2, type = $3, updated_at = $4
+		WHERE id = $5
 	`
 
-	_, err = h.db.Exec(query,
+	_, err = tx.Exec(query,
 		input.Name,
 		input.Description,
 		input.Type,
-		input.VhostID,
 		time.Now(),
 		id,
 	)
 
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Delete existing vhost associations
+	_, err = tx.Exec(`DELETE FROM ip_group_vhosts WHERE ip_group_id = $1`, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Insert new vhost associations
+	if len(input.VhostIDs) > 0 {
+		for _, vhostID := range input.VhostIDs {
+			if vhostID != "" {
+				_, err = tx.Exec(`
+					INSERT INTO ip_group_vhosts (ip_group_id, vhost_id)
+					VALUES ($1, $2)
+					ON CONFLICT (ip_group_id, vhost_id) DO NOTHING
+				`, id, vhostID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+			}
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

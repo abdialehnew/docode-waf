@@ -19,7 +19,7 @@ const IPGroups = () => {
     name: '',
     description: '',
     type: 'blacklist',
-    vhost_id: null,
+    vhost_ids: [],
   })
   const [ipFormData, setIPFormData] = useState({
     ip_address: '',
@@ -64,7 +64,7 @@ const IPGroups = () => {
       }
       setShowGroupModal(false)
       setEditingGroup(null)
-      setFormData({ name: '', description: '', type: 'blacklist', vhost_id: null })
+      setFormData({ name: '', description: '', type: 'blacklist', vhost_ids: [] })
       loadGroups()
     } catch (error) {
       console.error('Failed to save group:', error)
@@ -77,7 +77,7 @@ const IPGroups = () => {
       name: group.name,
       description: group.description,
       type: group.type,
-      vhost_id: group.vhost_id
+      vhost_ids: group.vhost_ids || []
     })
     setShowGroupModal(true)
   }
@@ -207,13 +207,17 @@ const IPGroups = () => {
                 <div className="flex-1">
                   <h3 className="font-semibold">{group.name}</h3>
                   <p className="text-sm text-gray-600">{group.description}</p>
-                  {group.vhost_domain && (
-                    <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                      <Globe className="w-3 h-3" />
-                      {group.vhost_domain}
-                    </p>
-                  )}
-                  {!group.vhost_id && (
+                  {group.vhost_domains && group.vhost_domains.length > 0 ? (
+                    <div className="text-xs text-blue-600 mt-1 flex items-start gap-1">
+                      <Globe className="w-3 h-3 mt-0.5" />
+                      <span>
+                        {group.vhost_domains.join(', ')}
+                        {group.vhost_domains.length > 2 && (
+                          <span className="ml-1 text-gray-500">({group.vhost_domains.length} vhosts)</span>
+                        )}
+                      </span>
+                    </div>
+                  ) : (
                     <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                       <Globe className="w-3 h-3" />
                       Global (All Vhosts)
@@ -300,10 +304,15 @@ const IPGroups = () => {
                 <label className="block text-sm font-medium mb-1">Virtual Host (Optional)</label>
                 <select
                   className="input w-full"
-                  value={formData.vhost_id || ''}
-                  onChange={(e) => setFormData({ ...formData, vhost_id: e.target.value || null })}
+                  multiple
+                  size="5"
+                  value={formData.vhost_ids || []}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions, option => option.value)
+                    setFormData({ ...formData, vhost_ids: selected })
+                  }}
+                  style={{ height: 'auto', minHeight: '120px' }}
                 >
-                  <option value="">Global (Apply to All Vhosts)</option>
                   {(vhosts || []).map((vhost) => (
                     <option key={vhost.id} value={vhost.id}>
                       {vhost.domain} - {vhost.name}
@@ -311,7 +320,12 @@ const IPGroups = () => {
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Select a vhost to apply this rule only to that domain, or leave as Global to apply to all vhosts
+                  Select one or more vhosts (hold Ctrl/Cmd to select multiple), or leave empty to apply to all vhosts globally.
+                  {formData.vhost_ids && formData.vhost_ids.length > 0 && (
+                    <span className="block mt-1 font-medium text-blue-600">
+                      Selected: {formData.vhost_ids.length} vhost(s)
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -323,7 +337,7 @@ const IPGroups = () => {
                   onClick={() => {
                     setShowGroupModal(false)
                     setEditingGroup(null)
-                    setFormData({ name: '', description: '', type: 'blacklist', vhost_id: null })
+                    setFormData({ name: '', description: '', type: 'blacklist', vhost_ids: [] })
                   }}
                   className="btn btn-secondary flex-1"
                 >
