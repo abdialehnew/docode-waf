@@ -340,7 +340,7 @@ const Dashboard = () => {
                   const countryName = countryNames[countryCode] || countryCode
 
                   return (
-                    <tr key={idx} className="hover:bg-gray-50">
+                    <tr key={`${countryCode}-${idx}`} className="hover:bg-gray-50">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="text-2xl">{getCountryFlag(countryCode)}</span>
@@ -375,9 +375,7 @@ const Dashboard = () => {
                           <div className="w-full bg-gray-200 rounded-full h-2 max-w-[80px]">
                             <div
                               className={`h-2 rounded-full ${
-                                blockRate >= 80 ? 'bg-green-500' :
-                                blockRate >= 50 ? 'bg-yellow-500' :
-                                'bg-red-500'
+                                blockRate >= 80 ? 'bg-green-500' : (blockRate >= 50 ? 'bg-yellow-500' : 'bg-red-500')
                               }`}
                               style={{ width: `${blockRate}%` }}
                             />
