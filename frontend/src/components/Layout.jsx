@@ -46,7 +46,7 @@ const Layout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Virtual Hosts', path: '/vhosts', icon: Server },
-    { name: 'IP Groups', path: '/ip-groups', icon: Users },
+    { name: 'IP Groups & Blacklists/Whitelists', path: '/ip-groups', icon: Users },
     { name: 'Traffic Logs', path: '/traffic', icon: Activity },
     { name: 'SSL Certificates', path: '/certificates', icon: Lock },
     { 
