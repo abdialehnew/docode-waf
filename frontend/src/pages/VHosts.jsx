@@ -850,17 +850,19 @@ const VHosts = () => {
                     </div>
                   )}
                 </div>
-                {backendCheckMessage && (
-                  <p className={`text-xs mt-1 flex items-center gap-1 ${
-                    backendCheckStatus === 'success' 
-                      ? 'text-green-600' 
-                      : backendCheckStatus === 'error'
-                      ? 'text-red-600'
-                      : 'text-blue-600'
-                  }`}>
-                    {backendCheckMessage}
-                  </p>
-                )}
+                {backendCheckMessage && (() => {
+                  let statusColorClass = 'text-blue-600'
+                  if (backendCheckStatus === 'success') {
+                    statusColorClass = 'text-green-600'
+                  } else if (backendCheckStatus === 'error') {
+                    statusColorClass = 'text-red-600'
+                  }
+                  return (
+                    <p className={`text-xs mt-1 flex items-center gap-1 ${statusColorClass}`}>
+                      {backendCheckMessage}
+                    </p>
+                  )
+                })()}
               </div>
 
               <div className="flex items-center gap-2">
@@ -939,13 +941,19 @@ const VHosts = () => {
                                 <div className="text-sm font-medium text-gray-900">{cert.name}</div>
                                 <div className="text-xs text-gray-500 mt-0.5">
                                   {cert.common_name && <span className="mr-2">CN: {cert.common_name}</span>}
-                                  <span className={`${
-                                    new Date(cert.valid_to) < new Date() 
-                                      ? 'text-red-600' 
-                                      : new Date(cert.valid_to) < new Date(Date.now() + 30*24*60*60*1000)
-                                      ? 'text-yellow-600'
-                                      : 'text-green-600'
-                                  }`}>
+                                  <span className={(() => {
+                                    const validTo = new Date(cert.valid_to)
+                                    const now = new Date()
+                                    const thirtyDaysFromNow = new Date(Date.now() + 30*24*60*60*1000)
+                                    
+                                    if (validTo < now) {
+                                      return 'text-red-600'
+                                    } else if (validTo < thirtyDaysFromNow) {
+                                      return 'text-yellow-600'
+                                    } else {
+                                      return 'text-green-600'
+                                    }
+                                  })()}>
                                     Expires: {new Date(cert.valid_to).toLocaleDateString()}
                                   </span>
                                 </div>
