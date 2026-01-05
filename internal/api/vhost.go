@@ -14,6 +14,10 @@ import (
 	"github.com/lib/pq"
 )
 
+const (
+	proxyReloadWarningMsg = "Warning: Failed to reload proxy map: %v\n"
+)
+
 // VHostHandler handles virtual host requests
 type ProxyReloader interface {
 	ReloadVHosts() error
@@ -405,7 +409,7 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	// Reload proxy map to include new vhost
 	if h.proxyReloader != nil {
 		if err := h.proxyReloader.ReloadVHosts(); err != nil {
-			fmt.Printf("Warning: Failed to reload proxy map: %v\n", err)
+			fmt.Printf(proxyReloadWarningMsg, err)
 		}
 	}
 
@@ -581,7 +585,7 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	// Reload proxy map
 	if h.proxyReloader != nil {
 		if err := h.proxyReloader.ReloadVHosts(); err != nil {
-			fmt.Printf("Warning: Failed to reload proxy map: %v\n", err)
+			fmt.Printf(proxyReloadWarningMsg, err)
 		}
 	}
 
@@ -636,7 +640,7 @@ func (h *VHostHandler) DeleteVHost(c *gin.Context) {
 	// Reload proxy map
 	if h.proxyReloader != nil {
 		if err := h.proxyReloader.ReloadVHosts(); err != nil {
-			fmt.Printf("Warning: Failed to reload proxy map: %v\n", err)
+			fmt.Printf(proxyReloadWarningMsg, err)
 		}
 	}
 

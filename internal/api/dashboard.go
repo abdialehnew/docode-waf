@@ -9,9 +9,11 @@ import (
 )
 
 const (
-	timeStartSuffix = " 00:00:00' AND timestamp <= '"
-	timeEndSuffix   = " 23:59:59'"
-	interval24Hours = "24 hours"
+	timeStartSuffix     = " 00:00:00' AND timestamp <= '"
+	timeEndSuffix       = " 23:59:59'"
+	interval24Hours     = "24 hours"
+	intervalQueryPrefix = " AND timestamp >= NOW() - INTERVAL '"
+	intervalWherePrefix = " WHERE timestamp >= NOW() - INTERVAL '"
 )
 
 // DashboardHandler handles dashboard requests
@@ -56,12 +58,12 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		default:
 			interval = interval24Hours
 		}
-		whereClause = " WHERE timestamp >= NOW() - INTERVAL '" + interval + "'"
-		andClause = " AND timestamp >= NOW() - INTERVAL '" + interval + "'"
+		whereClause = intervalWherePrefix + interval + "'"
+		andClause = intervalQueryPrefix + interval + "'"
 	} else {
 		// Default to last 24 hours if no range specified
-		whereClause = " WHERE timestamp >= NOW() - INTERVAL '" + interval24Hours + "'"
-		andClause = " AND timestamp >= NOW() - INTERVAL '" + interval24Hours + "'"
+		whereClause = intervalWherePrefix + interval24Hours + "'"
+		andClause = intervalQueryPrefix + interval24Hours + "'"
 	}
 
 	// Get total requests
