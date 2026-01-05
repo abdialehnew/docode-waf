@@ -135,7 +135,7 @@ const VHosts = () => {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
 
-      const response = await fetch(url, {
+      await fetch(url, {
         method: 'HEAD',
         mode: 'no-cors', // Allow cross-origin requests
         signal: controller.signal,
@@ -187,13 +187,13 @@ const VHosts = () => {
 
     const timeoutId = setTimeout(async () => {
       try {
-        const response = await fetch(newLocation.proxy_pass, { 
+        await fetch(newLocation.proxy_pass, { 
           method: 'HEAD',
           mode: 'no-cors',
           cache: 'no-cache'
         })
         setLocationBackendCheck({ status: 'success', message: 'Backend is reachable' })
-      } catch (error) {
+      } catch {
         setLocationBackendCheck({ status: 'warning', message: 'Cannot verify (CORS/Network), but may still work' })
       }
     }, 800)
@@ -800,8 +800,9 @@ const VHosts = () => {
             <h2 className="text-2xl font-bold mb-4">{isEditMode ? 'Edit Virtual Host' : 'Add Virtual Host'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="label">Name</label>
+                <label htmlFor="vhost-name" className="label">Name</label>
                 <input
+                  id="vhost-name"
                   type="text"
                   className="input"
                   value={formData.name}
@@ -811,8 +812,9 @@ const VHosts = () => {
               </div>
 
               <div>
-                <label className="label">Domain</label>
+                <label htmlFor="vhost-domain" className="label">Domain</label>
                 <input
+                  id="vhost-domain"
                   type="text"
                   className="input"
                   placeholder="example.com"
@@ -823,9 +825,10 @@ const VHosts = () => {
               </div>
 
               <div>
-                <label className="label">Backend URL</label>
+                <label htmlFor="vhost-backend" className="label">Backend URL</label>
                 <div className="relative">
                   <input
+                    id="vhost-backend"
                     type="text"
                     className="input pr-10"
                     placeholder="http://localhost:8000"
@@ -879,9 +882,10 @@ const VHosts = () => {
               {/* SSL Certificate Dropdown */}
               {formData.ssl_enabled && (
                 <div className="relative">
-                  <label className="label">SSL Certificate *</label>
+                  <label htmlFor="ssl-certificate" className="label">SSL Certificate *</label>
                   <div className="relative">
                     <button
+                      id="ssl-certificate"
                       type="button"
                       onClick={() => setShowCertDropdown(!showCertDropdown)}
                       className="input w-full text-left flex items-center justify-between"
