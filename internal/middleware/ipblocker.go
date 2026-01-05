@@ -74,14 +74,22 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 }
 
 func isIPInGroup(db *sqlx.DB, clientIP, domain, groupType string) (bool, error) {
-	// Check both global rules (vhost_id IS NULL) and vhost-specific rules
+	// Check both global rules (no vhost associations) and vhost-specific rules
+	// Updated to use ip_group_vhosts junction table
 	query := `
-		SELECT ia.ip_address, ia.cidr_mask 
+		SELECT DISTINCT ia.ip_address, ia.cidr_mask 
 		FROM ip_addresses ia
 		JOIN ip_groups ig ON ia.group_id = ig.id
-		LEFT JOIN vhosts v ON ig.vhost_id = v.id
+		LEFT JOIN ip_group_vhosts igv ON ig.id = igv.ip_group_id
+		LEFT JOIN vhosts v ON igv.vhost_id = v.id
 		WHERE ig.type = $1 
-		AND (ig.vhost_id IS NULL OR v.domain = $2)
+		AND (
+			-- Global rules: no vhost associations
+			NOT EXISTS (SELECT 1 FROM ip_group_vhosts WHERE ip_group_id = ig.id)
+			OR 
+			-- Vhost-specific rules: matches current domain
+			v.domain = $2
+		)
 	`
 
 	var addresses []struct {

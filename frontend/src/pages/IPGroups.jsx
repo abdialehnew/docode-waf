@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getIPGroups, createIPGroup, updateIPGroup, deleteIPGroup, addIPToGroup, getGroupIPs, updateIPAddress, removeIPFromGroup, getVHosts } from '../services/api'
 import { Plus, Trash2, Shield, Edit2, Eye, Globe } from 'lucide-react'
 import ConfirmModal from '../components/ConfirmModal'
@@ -8,6 +8,7 @@ const IPGroups = () => {
   const [vhosts, setVhosts] = useState([])
   const [loading, setLoading] = useState(true)
   const [showGroupModal, setShowGroupModal] = useState(false)
+  const vhostDropdownRef = useRef(null)
   const [showIPModal, setShowIPModal] = useState(false)
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [editingGroup, setEditingGroup] = useState(null)
@@ -15,6 +16,8 @@ const IPGroups = () => {
   const [groupIPs, setGroupIPs] = useState([])
   const [loadingIPs, setLoadingIPs] = useState(false)
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null, title: '', message: '' })
+  const [vhostSearchTerm, setVhostSearchTerm] = useState('')
+  const [showVhostDropdown, setShowVhostDropdown] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -31,6 +34,22 @@ const IPGroups = () => {
     loadGroups()
     loadVhosts()
   }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (vhostDropdownRef.current && !vhostDropdownRef.current.contains(event.target)) {
+        setShowVhostDropdown(false)
+      }
+    }
+
+    if (showVhostDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [showVhostDropdown])
 
   const loadVhosts = async () => {
     try {
@@ -300,30 +319,154 @@ const IPGroups = () => {
                   <option value="whitelist">Whitelist</option>
                 </select>
               </div>
-              <div>
+              <div ref={vhostDropdownRef}>
                 <label className="block text-sm font-medium mb-1">Virtual Host (Optional)</label>
-                <select
-                  className="input w-full"
-                  multiple
-                  size="5"
-                  value={formData.vhost_ids || []}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions, option => option.value)
-                    setFormData({ ...formData, vhost_ids: selected })
-                  }}
-                  style={{ height: 'auto', minHeight: '120px' }}
+                
+                {/* Selected items display with tags */}
+                <div 
+                  className="input w-full min-h-[42px] cursor-pointer flex flex-wrap gap-2 items-center"
+                  onClick={() => setShowVhostDropdown(!showVhostDropdown)}
                 >
-                  {(vhosts || []).map((vhost) => (
-                    <option key={vhost.id} value={vhost.id}>
-                      {vhost.domain} - {vhost.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Select one or more vhosts (hold Ctrl/Cmd to select multiple), or leave empty to apply to all vhosts globally.
+                  {(formData.vhost_ids || []).length === 0 ? (
+                    <span className="text-gray-400 text-sm">Select vhosts...</span>
+                  ) : (
+                    <>
+                      {(formData.vhost_ids || []).map(vhostId => {
+                        const vhost = (vhosts || []).find(v => v.id === vhostId)
+                        if (!vhost) return null
+                        return (
+                          <span
+                            key={vhostId}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span>{vhost.domain}</span>
+                            <button
+                              type="button"
+                              className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const currentIds = formData.vhost_ids || []
+                                setFormData({ ...formData, vhost_ids: currentIds.filter(id => id !== vhostId) })
+                              }}
+                            >
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </span>
+                        )
+                      })}
+                    </>
+                  )}
+                </div>
+                
+                {/* Dropdown menu */}
+                {showVhostDropdown && (
+                  <div className="relative mt-1">
+                    <div className="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden">
+                      {/* Search input inside dropdown */}
+                      <div className="p-2 border-b border-gray-200 bg-gray-50">
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="🔍 Search vhosts..."
+                          value={vhostSearchTerm}
+                          onChange={(e) => setVhostSearchTerm(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      
+                      {/* Action buttons */}
+                      {(vhosts || []).length > 0 && (
+                        <div className="flex gap-2 p-2 border-b border-gray-200 bg-gray-50">
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const filteredVhosts = (vhosts || []).filter(vhost => 
+                                vhostSearchTerm === '' ||
+                                vhost.domain.toLowerCase().includes(vhostSearchTerm.toLowerCase()) ||
+                                vhost.name.toLowerCase().includes(vhostSearchTerm.toLowerCase())
+                              )
+                              const allIds = filteredVhosts.map(v => v.id)
+                              setFormData({ ...formData, vhost_ids: allIds })
+                            }}
+                          >
+                            ✓ Select All
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100 transition"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setFormData({ ...formData, vhost_ids: [] })
+                            }}
+                          >
+                            ✕ Clear All
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Vhost list */}
+                      <div className="max-h-80 overflow-y-auto" style={{ maxHeight: '320px' }}>
+                        {(vhosts || [])
+                          .filter(vhost => 
+                            vhostSearchTerm === '' ||
+                            vhost.domain.toLowerCase().includes(vhostSearchTerm.toLowerCase()) ||
+                            vhost.name.toLowerCase().includes(vhostSearchTerm.toLowerCase())
+                          )
+                          .map((vhost) => {
+                            const isSelected = (formData.vhost_ids || []).includes(vhost.id)
+                            return (
+                              <div
+                                key={vhost.id}
+                                className={`flex items-center px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
+                                  isSelected ? 'bg-blue-50' : ''
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const currentIds = formData.vhost_ids || []
+                                  if (isSelected) {
+                                    setFormData({ ...formData, vhost_ids: currentIds.filter(id => id !== vhost.id) })
+                                  } else {
+                                    setFormData({ ...formData, vhost_ids: [...currentIds, vhost.id] })
+                                  }
+                                }}
+                              >
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium text-gray-900">{vhost.domain}</div>
+                                  <div className="text-xs text-gray-500">{vhost.name}</div>
+                                </div>
+                                {isSelected && (
+                                  <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            )
+                          })}
+                        {(vhosts || []).filter(vhost => 
+                          vhostSearchTerm === '' ||
+                          vhost.domain.toLowerCase().includes(vhostSearchTerm.toLowerCase()) ||
+                          vhost.name.toLowerCase().includes(vhostSearchTerm.toLowerCase())
+                        ).length === 0 && (
+                          <div className="px-3 py-8 text-center text-gray-500 text-sm">
+                            <div className="text-2xl mb-2">🔍</div>
+                            No vhosts found matching "{vhostSearchTerm}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-xs text-gray-500 mt-2">
+                  Select one or more vhosts, or leave empty to apply to all vhosts globally.
                   {formData.vhost_ids && formData.vhost_ids.length > 0 && (
                     <span className="block mt-1 font-medium text-blue-600">
-                      Selected: {formData.vhost_ids.length} vhost(s)
+                      ✓ Selected: {formData.vhost_ids.length} vhost(s)
                     </span>
                   )}
                 </p>
