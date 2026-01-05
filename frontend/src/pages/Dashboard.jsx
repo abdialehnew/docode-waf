@@ -3,6 +3,7 @@ import { getDashboardStats, getAttacksByCountry } from '../services/api'
 import { Activity, Shield, AlertTriangle, Globe, Search, Calendar, Loader2 } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { format, subDays, differenceInDays } from 'date-fns'
+import logger from '../utils/logger'
 
 // Country code to flag emoji mapping
 const getCountryFlag = (countryCode) => {
@@ -58,7 +59,7 @@ const Dashboard = () => {
       const countryResponse = await getAttacksByCountry(params)
       setCountryStats(countryResponse.data || [])
     } catch (error) {
-      console.error('Failed to load stats:', error)
+      logger.error('Failed to load stats:', error)
     } finally {
       setLoading(false)
       setFetching(false)

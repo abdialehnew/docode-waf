@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { getVHosts, createVHost, deleteVHost } from '../services/api'
 import { Plus, Trash2, Edit, Server, Search, Grid3x3, List, ChevronUp, ChevronDown, ChevronsUpDown, ChevronDown as ChevronDownIcon, CheckCircle, AlertCircle, Loader2, Shield, Eye, ExternalLink, ChevronLeft, ChevronRight, FileCode } from 'lucide-react'
+import logger from '../utils/logger'
 
 const VHosts = () => {
   const navigate = useNavigate()
@@ -87,7 +88,7 @@ const VHosts = () => {
       const data = response.data?.vhosts || response.data || []
       setVHosts(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error('Failed to load vhosts:', error)
+      logger.error('Failed to load vhosts:', error)
       setVHosts([])
     } finally {
       setLoading(false)
@@ -103,7 +104,7 @@ const VHosts = () => {
       const data = response.data?.certificates || response.data || []
       setCertificates(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error('Failed to load certificates:', error)
+      logger.error('Failed to load certificates:', error)
       setCertificates([])
     } finally {
       setGlobalLoading(false)
@@ -247,7 +248,7 @@ const VHosts = () => {
       setNewHeader({ key: '', value: '' })
       await loadVHosts()
     } catch (error) {
-      console.error('Failed to save vhost:', error)
+      logger.error('Failed to save vhost:', error)
       setGlobalLoading(false)
     }
   }
@@ -262,7 +263,7 @@ const VHosts = () => {
         await deleteVHost(id)
         await loadVHosts()
       } catch (error) {
-        console.error('Failed to delete vhost:', error)
+        logger.error('Failed to delete vhost:', error)
       } finally {
         setGlobalLoading(false)
       }
@@ -306,7 +307,7 @@ const VHosts = () => {
         setSelectedVHosts([])
         await loadVHosts()
       } catch (error) {
-        console.error('Failed to bulk delete vhosts:', error)
+        logger.error('Failed to bulk delete vhosts:', error)
       } finally {
         setGlobalLoading(false)
       }

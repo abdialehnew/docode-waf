@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Shield, Mail, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { getTurnstileSiteKey } from '../services/api';
 import Turnstile from '../components/Turnstile';
+import logger from '../utils/logger';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ const Register = () => {
         setTurnstileConfig(response.data);
       }
     } catch (error) {
-      console.error('Failed to load Turnstile config:', error);
+      logger.error('Failed to load Turnstile config:', error);
     }
   };
 

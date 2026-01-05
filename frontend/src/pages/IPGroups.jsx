@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { getIPGroups, createIPGroup, updateIPGroup, deleteIPGroup, addIPToGroup, getGroupIPs, updateIPAddress, removeIPFromGroup, getVHosts } from '../services/api'
 import { Plus, Trash2, Shield, Edit2, Eye, Globe } from 'lucide-react'
 import ConfirmModal from '../components/ConfirmModal'
+import logger from '../utils/logger'
 
 const IPGroups = () => {
   const [groups, setGroups] = useState([])
@@ -56,7 +57,7 @@ const IPGroups = () => {
       const response = await getVHosts()
       setVhosts(response.data || [])
     } catch (error) {
-      console.error('Failed to load vhosts:', error)
+      logger.error('Failed to load vhosts:', error)
       setVhosts([])
     }
   }
@@ -66,7 +67,7 @@ const IPGroups = () => {
       const response = await getIPGroups()
       setGroups(response.data || [])
     } catch (error) {
-      console.error('Failed to load IP groups:', error)
+      logger.error('Failed to load IP groups:', error)
       setGroups([])
     } finally {
       setLoading(false)
@@ -86,7 +87,7 @@ const IPGroups = () => {
       setFormData({ name: '', description: '', type: 'blacklist', vhost_ids: [] })
       loadGroups()
     } catch (error) {
-      console.error('Failed to save group:', error)
+      logger.error('Failed to save group:', error)
     }
   }
 
@@ -112,7 +113,7 @@ const IPGroups = () => {
           await deleteIPGroup(id)
           loadGroups()
         } catch (error) {
-          console.error('Failed to delete group:', error)
+          logger.error('Failed to delete group:', error)
         }
       }
     })
@@ -125,7 +126,7 @@ const IPGroups = () => {
       const response = await getGroupIPs(group.id)
       setGroupIPs(response.data || [])
     } catch (error) {
-      console.error('Failed to load IPs:', error)
+      logger.error('Failed to load IPs:', error)
       setGroupIPs([])
     } finally {
       setLoadingIPs(false)
@@ -140,7 +141,7 @@ const IPGroups = () => {
       setIPFormData({ ip_address: '', cidr_mask: null, description: '' })
       handleViewIPs(selectedGroup)
     } catch (error) {
-      console.error('Failed to add IP:', error)
+      logger.error('Failed to add IP:', error)
     }
   }
 
@@ -170,7 +171,7 @@ const IPGroups = () => {
       setEditingIP(null)
       handleViewIPs(selectedGroup)
     } catch (error) {
-      console.error('Failed to update IP:', error)
+      logger.error('Failed to update IP:', error)
     }
   }
 
@@ -186,7 +187,7 @@ const IPGroups = () => {
       await removeIPFromGroup(selectedGroup.id, ipId)
       handleViewIPs(selectedGroup)
     } catch (error) {
-      console.error('Failed to remove IP:', error)
+      logger.error('Failed to remove IP:', error)
     }
   }
 
@@ -290,8 +291,9 @@ const IPGroups = () => {
             </h2>
             <form onSubmit={handleCreateGroup} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
+                <label htmlFor="group-name" className="block text-sm font-medium mb-1">Name</label>
                 <input
+                  id="group-name"
                   type="text"
                   className="input w-full"
                   value={formData.name}
@@ -300,8 +302,9 @@ const IPGroups = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label htmlFor="group-description" className="block text-sm font-medium mb-1">Description</label>
                 <textarea
+                  id="group-description"
                   className="input w-full"
                   rows="3"
                   value={formData.description}
@@ -309,8 +312,9 @@ const IPGroups = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Type</label>
+                <label htmlFor="group-type" className="block text-sm font-medium mb-1">Type</label>
                 <select
+                  id="group-type"
                   className="input w-full"
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -320,12 +324,21 @@ const IPGroups = () => {
                 </select>
               </div>
               <div ref={vhostDropdownRef}>
-                <label className="block text-sm font-medium mb-1">Virtual Host (Optional)</label>
+                <label htmlFor="group-vhosts" className="block text-sm font-medium mb-1">Virtual Host (Optional)</label>
                 
                 {/* Selected items display with tags */}
                 <div 
+                  id="group-vhosts"
+                  role="button"
+                  tabIndex={0}
                   className="input w-full min-h-[42px] cursor-pointer flex flex-wrap gap-2 items-center"
                   onClick={() => setShowVhostDropdown(!showVhostDropdown)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setShowVhostDropdown(!showVhostDropdown)
+                    }
+                  }}
                 >
                   {(formData.vhost_ids || []).length === 0 ? (
                     <span className="text-gray-400 text-sm">Select vhosts...</span>
@@ -337,8 +350,11 @@ const IPGroups = () => {
                         return (
                           <span
                             key={vhostId}
+                            role="button"
+                            tabIndex={0}
                             className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm"
                             onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
                           >
                             <span>{vhost.domain}</span>
                             <button
@@ -422,6 +438,8 @@ const IPGroups = () => {
                             return (
                               <div
                                 key={vhost.id}
+                                role="button"
+                                tabIndex={0}
                                 className={`flex items-center px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
                                   isSelected ? 'bg-blue-50' : ''
                                 }`}
@@ -432,6 +450,18 @@ const IPGroups = () => {
                                     setFormData({ ...formData, vhost_ids: currentIds.filter(id => id !== vhost.id) })
                                   } else {
                                     setFormData({ ...formData, vhost_ids: [...currentIds, vhost.id] })
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    const currentIds = formData.vhost_ids || []
+                                    if (isSelected) {
+                                      setFormData({ ...formData, vhost_ids: currentIds.filter(id => id !== vhost.id) })
+                                    } else {
+                                      setFormData({ ...formData, vhost_ids: [...currentIds, vhost.id] })
+                                    }
                                   }
                                 }}
                               >
@@ -515,8 +545,9 @@ const IPGroups = () => {
               ) : (groupIPs || []).length === 0 ? (
                 <div className="text-center py-4 text-gray-500">No IPs added yet</div>
               ) : (
-                (groupIPs || []).map((ip) => (
-                  <div key={ip.id} className="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                <div className="space-y-2">
+                  {(groupIPs || []).map((ip) => (
+                    <div key={ip.id} className="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
                     {editingIP && editingIP.id === ip.id ? (
                       <div className="flex-1 space-y-2">
                         <div className="flex gap-2">
@@ -592,7 +623,8 @@ const IPGroups = () => {
                       </>
                     )}
                   </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
 
@@ -616,8 +648,9 @@ const IPGroups = () => {
             <h2 className="text-2xl font-bold mb-4">Add IP Address</h2>
             <form onSubmit={handleAddIP} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">IP Address</label>
+                <label htmlFor="ip-address" className="block text-sm font-medium mb-1">IP Address</label>
                 <input
+                  id="ip-address"
                   type="text"
                   className="input w-full"
                   placeholder="e.g., 192.168.1.100"
@@ -627,8 +660,9 @@ const IPGroups = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">CIDR Mask (optional)</label>
+                <label htmlFor="cidr-mask" className="block text-sm font-medium mb-1">CIDR Mask (optional)</label>
                 <input
+                  id="cidr-mask"
                   type="number"
                   className="input w-full"
                   placeholder="e.g., 24 for /24"
@@ -642,8 +676,9 @@ const IPGroups = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label htmlFor="ip-description" className="block text-sm font-medium mb-1">Description</label>
                 <textarea
+                  id="ip-description"
                   className="input w-full"
                   rows="2"
                   placeholder="Optional description"

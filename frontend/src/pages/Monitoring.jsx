@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import api from '../services/api';
+import logger from '../utils/logger';
 
 const Monitoring = () => {
   const [activeTab, setActiveTab] = useState('nginx');
@@ -85,7 +86,7 @@ const Monitoring = () => {
       setVhosts(data);
       // Don't auto-select first vhost, let user choose
     } catch (error) {
-      console.error('Failed to fetch vhosts:', error);
+      logger.error('Failed to fetch vhosts:', error);
       setVhosts([]);
     }
   };
@@ -101,7 +102,7 @@ const Monitoring = () => {
       });
       setNginxLogs(response.data?.lines || []);
     } catch (error) {
-      console.error('Failed to fetch nginx logs:', error);
+      logger.error('Failed to fetch nginx logs:', error);
       setNginxLogs([]);
     } finally {
       setLoading(false);
@@ -120,7 +121,7 @@ const Monitoring = () => {
       });
       setWafLogs(response.data?.logs || []);
     } catch (error) {
-      console.error('Failed to fetch WAF logs:', error);
+      logger.error('Failed to fetch WAF logs:', error);
       setWafLogs([]);
     } finally {
       setLoading(false);

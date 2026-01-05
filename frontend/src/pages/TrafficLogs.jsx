@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getTrafficLogs } from '../services/api'
 import { format } from 'date-fns'
 import { RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from 'lucide-react'
+import logger from '../utils/logger'
 
 const TrafficLogs = () => {
   const [logs, setLogs] = useState([])
@@ -31,7 +32,7 @@ const TrafficLogs = () => {
       setLogs(logsData)
       setTotalLogs(logsData.length)
     } catch (error) {
-      console.error('Failed to load traffic logs:', error)
+      logger.error('Failed to load traffic logs:', error)
       setLogs([])
       setTotalLogs(0)
     } finally {

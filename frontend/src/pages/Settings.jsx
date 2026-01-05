@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Settings as SettingsIcon, Upload, X, Mail, Eye, EyeOff } from 'lucide-react'
 import api from '../services/api'
+import logger from '../utils/logger'
 
 const Settings = () => {
   const [appSettings, setAppSettings] = useState({
@@ -33,7 +34,7 @@ const Settings = () => {
         }
       }
     } catch (error) {
-      console.error('Failed to load app settings:', error)
+      logger.error('Failed to load app settings:', error)
     }
   }
 
@@ -75,7 +76,7 @@ const Settings = () => {
       // Reload page to update logo in sidebar
       window.location.reload()
     } catch (error) {
-      console.error('Failed to save app settings:', error)
+      logger.error('Failed to save app settings:', error)
       alert('Failed to save settings: ' + (error.response?.data?.error || error.message))
     } finally {
       setLoading(false)

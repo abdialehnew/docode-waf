@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Shield, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { getAppSettings, getTurnstileSiteKey } from '../services/api';
 import Turnstile from '../components/Turnstile';
+import logger from '../utils/logger';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ const Login = () => {
         document.title = response.data.app_name || 'Docode WAF';
       }
     } catch (error) {
-      console.error('Failed to load app settings:', error);
+      logger.error('Failed to load app settings:', error);
     }
   };
 
@@ -51,7 +52,7 @@ const Login = () => {
         setTurnstileConfig(response.data);
       }
     } catch (error) {
-      console.error('Failed to load Turnstile config:', error);
+      logger.error('Failed to load Turnstile config:', error);
     }
   };
 
