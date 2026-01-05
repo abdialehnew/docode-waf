@@ -114,12 +114,34 @@ func detectAttackType(c *gin.Context) (bool, string) {
 		}
 	}
 
-	// Admin Panel Scanning
+	// Admin Panel Scanning - use more specific patterns to avoid false positives
+	// Check for actual admin paths, not just keywords in source code files
+	urlLower := strings.ToLower(url)
+
+	// Exact path matches (start of path)
 	adminPaths := []string{"/admin", "/administrator", "/wp-admin", "/phpmyadmin",
-		"/cpanel", "/admin.php", "/admin/login", "/dashboard", "/backend"}
+		"/cpanel", "/admin.php", "/adminpanel", "/backend", "/management"}
 	for _, path := range adminPaths {
-		if strings.Contains(strings.ToLower(url), path) {
+		// Check if URL starts with admin path or has it after domain
+		if strings.HasPrefix(urlLower, path) || strings.Contains(urlLower, "://"+c.Request.Host+path) {
 			return true, "Admin Scan"
+		}
+	}
+
+	// Common admin file patterns (avoid matching .tsx, .ts, .jsx, .js source files)
+	adminFilePatterns := []string{"/admin/login", "/admin/index", "/login.php", "/admin.asp"}
+	for _, pattern := range adminFilePatterns {
+		if strings.Contains(urlLower, pattern) {
+			return true, "Admin Scan"
+		}
+	}
+
+	// Exclude source code files from detection
+	sourceFileExtensions := []string{".tsx", ".ts", ".jsx", ".js", ".vue", ".py", ".go", ".java"}
+	for _, ext := range sourceFileExtensions {
+		if strings.HasSuffix(urlLower, ext) {
+			// Skip attack detection for source code files
+			break
 		}
 	}
 
