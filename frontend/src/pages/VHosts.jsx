@@ -329,7 +329,7 @@ const VHosts = () => {
       backend_url: vhost.backend_url || '',
       ssl_enabled: vhost.ssl_enabled || false,
       ssl_certificate_id: vhost.ssl_certificate_id || '',
-      enabled: vhost.enabled !== undefined ? vhost.enabled : true,
+      enabled: vhost.enabled === undefined ? true : vhost.enabled,
       websocket_enabled: vhost.websocket_enabled || false,
       http_version: vhost.http_version || 'http/1.1',
       tls_version: vhost.tls_version || 'TLSv1.2',
@@ -388,6 +388,17 @@ const VHosts = () => {
 
   // Get selected certificate details
   const selectedCertificate = certificates.find(cert => cert.id === formData.ssl_certificate_id)
+
+  // Helper function for certificate expiry status color
+  const getCertExpiryColor = (validToDate) => {
+    const validTo = new Date(validToDate)
+    const now = new Date()
+    const thirtyDaysFromNow = new Date(Date.now() + 30*24*60*60*1000)
+    
+    if (validTo < now) return 'text-red-600'
+    if (validTo < thirtyDaysFromNow) return 'text-yellow-600'
+    return 'text-green-600'
+  }
 
   const SortIcon = ({ field }) => {
     if (sortField !== field) return <ChevronsUpDown className="w-4 h-4 text-gray-400" />
@@ -850,19 +861,11 @@ const VHosts = () => {
                     </div>
                   )}
                 </div>
-                {backendCheckMessage && (() => {
-                  let statusColorClass = 'text-blue-600'
-                  if (backendCheckStatus === 'success') {
-                    statusColorClass = 'text-green-600'
-                  } else if (backendCheckStatus === 'error') {
-                    statusColorClass = 'text-red-600'
-                  }
-                  return (
-                    <p className={`text-xs mt-1 flex items-center gap-1 ${statusColorClass}`}>
-                      {backendCheckMessage}
-                    </p>
-                  )
-                })()}
+                {backendCheckMessage && (
+                  <p className={`text-xs mt-1 flex items-center gap-1 ${getBackendCheckColor(backendCheckStatus)}`}>
+                    {backendCheckMessage}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -941,19 +944,7 @@ const VHosts = () => {
                                 <div className="text-sm font-medium text-gray-900">{cert.name}</div>
                                 <div className="text-xs text-gray-500 mt-0.5">
                                   {cert.common_name && <span className="mr-2">CN: {cert.common_name}</span>}
-                                  <span className={(() => {
-                                    const validTo = new Date(cert.valid_to)
-                                    const now = new Date()
-                                    const thirtyDaysFromNow = new Date(Date.now() + 30*24*60*60*1000)
-                                    
-                                    if (validTo < now) {
-                                      return 'text-red-600'
-                                    } else if (validTo < thirtyDaysFromNow) {
-                                      return 'text-yellow-600'
-                                    } else {
-                                      return 'text-green-600'
-                                    }
-                                  })()}>
+                                  <span className={getCertExpiryColor(cert.valid_to)}>
                                     Expires: {new Date(cert.valid_to).toLocaleDateString()}
                                   </span>
                                 </div>
@@ -1185,7 +1176,7 @@ const VHosts = () => {
                             placeholder="US,GB,ID,SG"
                             value={formData.region_whitelist?.join(',') || ''}
                             onChange={(e) => {
-                              const codes = e.target.value.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+                              const codes = e.target.value.split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
                               setFormData({ ...formData, region_whitelist: codes });
                             }}
                           />
@@ -1201,7 +1192,7 @@ const VHosts = () => {
                             placeholder="CN,RU,KP"
                             value={formData.region_blacklist?.join(',') || ''}
                             onChange={(e) => {
-                              const codes = e.target.value.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+                              const codes = e.target.value.split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
                               setFormData({ ...formData, region_blacklist: codes });
                             }}
                           />
@@ -1357,15 +1348,7 @@ const VHosts = () => {
                             )}
                           </div>
                           {locationBackendCheck.message && (
-                            <p className={`text-xs flex items-center gap-1 ${
-                              locationBackendCheck.status === 'success' 
-                                ? 'text-green-600' 
-                                : locationBackendCheck.status === 'error'
-                                ? 'text-red-600'
-                                : locationBackendCheck.status === 'warning'
-                                ? 'text-yellow-600'
-                                : 'text-blue-600'
-                            }`}>
+                            <p className={`text-xs flex items-center gap-1 ${getLocationCheckColor(locationBackendCheck.status)}`}>
                               {locationBackendCheck.message}
                             </p>
                           )}
