@@ -51,6 +51,9 @@ const VHosts = () => {
     rate_limit_enabled: false,
     rate_limit_requests: 100,
     rate_limit_window: 60,
+    region_filtering_enabled: false,
+    region_whitelist: [],
+    region_blacklist: [],
     custom_locations: [],
     custom_headers: {},
   })
@@ -230,6 +233,9 @@ const VHosts = () => {
         rate_limit_enabled: false,
         rate_limit_requests: 100,
         rate_limit_window: 60,
+        region_filtering_enabled: false,
+        region_whitelist: [],
+        region_blacklist: [],
         custom_locations: [],
         custom_headers: {},
       })
@@ -335,6 +341,9 @@ const VHosts = () => {
       rate_limit_enabled: vhost.rate_limit_enabled || false,
       rate_limit_requests: vhost.rate_limit_requests || 100,
       rate_limit_window: vhost.rate_limit_window || 60,
+      region_filtering_enabled: vhost.region_filtering_enabled || false,
+      region_whitelist: vhost.region_whitelist || [],
+      region_blacklist: vhost.region_blacklist || [],
       custom_locations: vhost.custom_locations || [],
       custom_headers: vhost.custom_headers || {},
     })
@@ -1137,6 +1146,63 @@ const VHosts = () => {
                           <p className="text-xs text-gray-500">
                             Limit: {formData.rate_limit_requests} requests per {formData.rate_limit_window} seconds per IP
                           </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Region Filtering */}
+                  <div className="border-t border-gray-300 pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        type="checkbox"
+                        id="region_filtering"
+                        checked={formData.region_filtering_enabled}
+                        onChange={(e) => setFormData({ ...formData, region_filtering_enabled: e.target.checked })}
+                      />
+                      <label htmlFor="region_filtering" className="text-sm font-medium">Enable Region Filtering</label>
+                    </div>
+                    {formData.region_filtering_enabled && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="label">Whitelist Countries (ISO codes, e.g., US,GB,ID)</label>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="US,GB,ID,SG"
+                            value={formData.region_whitelist?.join(',') || ''}
+                            onChange={(e) => {
+                              const codes = e.target.value.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+                              setFormData({ ...formData, region_whitelist: codes });
+                            }}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            If set, ONLY these countries are allowed. Leave empty to allow all except blacklisted.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="label">Blacklist Countries (ISO codes, e.g., CN,RU)</label>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="CN,RU,KP"
+                            value={formData.region_blacklist?.join(',') || ''}
+                            onChange={(e) => {
+                              const codes = e.target.value.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+                              setFormData({ ...formData, region_blacklist: codes });
+                            }}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            These countries will be blocked. Only applies if whitelist is empty.
+                          </p>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs">
+                          <strong>Region Filtering Logic:</strong>
+                          <ul className="list-disc list-inside mt-1 space-y-1">
+                            <li>If whitelist is set: ONLY whitelist countries are allowed</li>
+                            <li>If whitelist is empty: All countries except blacklisted are allowed</li>
+                            <li>Uses IP-based geolocation (may not be 100% accurate)</li>
+                          </ul>
                         </div>
                       </div>
                     )}

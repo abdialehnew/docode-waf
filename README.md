@@ -51,8 +51,15 @@ This project is committed to maintaining high security and code quality standard
 ### Core Security
 - ✅ **Reverse Proxy** - High-performance reverse proxy with nginx integration
 - ✅ **Rate Limiting** - Configurable rate limiting per IP/endpoint with per-vhost control
-- ✅ **IP Blocking** - Block by single IP or CIDR blocks
+- ✅ **IP Blocking** - Block by single IP or CIDR blocks with multi-vhost support
+- ✅ **IP Groups** - Organize IPs into blacklist/whitelist groups with multiple vhost assignment
 - ✅ **Geographic Blocking** - Block requests by country (GeoIP2)
+- ✅ **Region Filtering (Per-VHost)** - Advanced country-based access control per domain:
+  - **Whitelist Mode** - Allow ONLY specified countries (e.g., US, GB, ID)
+  - **Blacklist Mode** - Block specific countries (e.g., CN, RU, KP)
+  - **ISO 3166-1 Alpha-2** - Standard country codes (2-letter)
+  - **ip-api.com Integration** - Free GeoIP lookup (45 requests/minute)
+  - **Custom Blocked Page** - Beautiful gradient page with country info
 - ✅ **URL Filtering** - Pattern-based URL blocking
 - ✅ **SSL Certificate Management** - Upload and manage SSL certificates per domain
 - ✅ **HTTP Flood Protection** - Protect against DDoS and HTTP flood attacks
@@ -498,6 +505,54 @@ blocked := []string{"10.0.0.0/8", "172.16.0.0/12"}
 blockedCountries := []string{"CN", "RU", "KP"}
 ```
 
+### Region Filtering (Per-VHost)
+
+**NEW** - Advanced country-based access control per virtual host:
+
+```
+Configuration via UI (Advanced Settings → Region Filtering):
+1. Enable Region Filtering checkbox
+2. Whitelist Countries: US,GB,ID,SG (comma-separated ISO codes)
+   - If set: ONLY these countries can access
+   - If empty: Proceed to blacklist check
+3. Blacklist Countries: CN,RU,KP (comma-separated ISO codes)
+   - Only applies if whitelist is empty
+   - Blocks specified countries
+
+Example Use Cases:
+- EU-only service: Whitelist all EU country codes
+- Block high-risk countries: Blacklist CN,RU,KP,IR
+- US/Canada only: Whitelist US,CA
+```
+
+**Country Code Format**: [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) (US, GB, ID, CN, RU, etc.)
+
+**GeoIP Provider**: [ip-api.com](https://ip-api.com/) (Free tier: 45 requests/minute)
+
+**Accuracy**: ~95-98% for country-level detection. Localhost (127.0.0.1) bypasses filtering.
+
+**Custom Blocked Page**: Beautiful gradient page showing blocked country and reason.
+
+### IP Groups with Multi-VHost Support
+
+**UPDATED** - IP Groups now support multiple virtual hosts:
+
+```
+Features:
+- Assign single IP group to multiple vhosts simultaneously
+- Multi-select dropdown (hold Ctrl/Cmd to select multiple)
+- Global rules: Leave vhost selection empty
+- Per-vhost rules: Select one or more specific domains
+- Junction table architecture for scalable many-to-many relationships
+
+Use Cases:
+- Apply same blacklist to multiple staging environments
+- Whitelist office IP for all internal apps
+- Country-specific IP groups per region
+```
+
+**Database Schema**: New `ip_group_vhosts` junction table for many-to-many relationships.
+
 ---
 
 ## 📊 Database Schema
@@ -510,6 +565,7 @@ blockedCountries := []string{"CN", "RU", "KP"}
   - Custom headers (JSONB) and location blocks
   - Max upload size and proxy timeouts
   - SSL certificate reference
+  - **Region filtering**: whitelist/blacklist by country (ISO 3166-1 alpha-2)
 - **vhost_locations** - Custom location blocks per vhost
   - Path, proxy_pass, custom_config
   - Enabled flag for easy toggle
@@ -524,6 +580,11 @@ blockedCountries := []string{"CN", "RU", "KP"}
   - `app_name` - Custom application name
   - `app_logo` - Base64 encoded logo image
 - **ip_groups** - IP whitelist/blacklist management
+  - **UPDATED**: Many-to-many relationship with vhosts via junction table
+- **ip_group_vhosts** - Junction table for IP groups ↔ VHosts (NEW)
+  - Enables single IP group to apply to multiple virtual hosts
+  - Unique constraint on (ip_group_id, vhost_id) pairs
+- **ip_addresses** - Individual IP entries within groups
 - **rules** - Custom WAF rules
 
 ---

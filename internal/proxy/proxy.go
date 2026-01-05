@@ -82,6 +82,16 @@ func (rp *ReverseProxy) LoadVHosts(vhosts []*models.VHost) {
 	}
 }
 
+// ReloadVHosts reloads all vhosts from database
+func (rp *ReverseProxy) ReloadVHosts() error {
+	vhosts, err := rp.vhostService.ListVHosts()
+	if err != nil {
+		return err
+	}
+	rp.LoadVHosts(vhosts)
+	return nil
+}
+
 func (rp *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host := r.Host
 	// Remove port from host if present

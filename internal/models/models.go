@@ -22,17 +22,20 @@ type Admin struct {
 
 // VHost represents a virtual host configuration
 type VHost struct {
-	ID               string    `json:"id" db:"id"`
-	Name             string    `json:"name" db:"name"`
-	Domain           string    `json:"domain" db:"domain"`
-	BackendURL       string    `json:"backend_url" db:"backend_url"`
-	SSLEnabled       bool      `json:"ssl_enabled" db:"ssl_enabled"`
-	SSLCertificateID string    `json:"ssl_certificate_id,omitempty" db:"ssl_certificate_id"`
-	SSLCertPath      string    `json:"ssl_cert_path,omitempty" db:"ssl_cert_path"`
-	SSLKeyPath       string    `json:"ssl_key_path,omitempty" db:"ssl_key_path"`
-	Enabled          bool      `json:"enabled" db:"enabled"`
-	CreatedAt        time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
+	ID                     string    `json:"id" db:"id"`
+	Name                   string    `json:"name" db:"name"`
+	Domain                 string    `json:"domain" db:"domain"`
+	BackendURL             string    `json:"backend_url" db:"backend_url"`
+	SSLEnabled             bool      `json:"ssl_enabled" db:"ssl_enabled"`
+	SSLCertificateID       string    `json:"ssl_certificate_id,omitempty" db:"ssl_certificate_id"`
+	SSLCertPath            string    `json:"ssl_cert_path,omitempty" db:"ssl_cert_path"`
+	SSLKeyPath             string    `json:"ssl_key_path,omitempty" db:"ssl_key_path"`
+	Enabled                bool      `json:"enabled" db:"enabled"`
+	RegionWhitelist        []string  `json:"region_whitelist" db:"region_whitelist"`
+	RegionBlacklist        []string  `json:"region_blacklist" db:"region_blacklist"`
+	RegionFilteringEnabled bool      `json:"region_filtering_enabled" db:"region_filtering_enabled"`
+	CreatedAt              time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // VHostLocation represents a specific path location within a vhost

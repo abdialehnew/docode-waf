@@ -105,10 +105,14 @@ func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, 
 	wafRouter := gin.New()
 	wafRouter.Use(gin.Recovery())
 
+	// Initialize GeoIP service
+	geoIPService := services.NewGeoIPService()
+
 	// Apply WAF middleware
 	wafRouter.Use(middleware.RateLimiterMiddleware(redisClient, db))
 	wafRouter.Use(middleware.HTTPFloodProtectionMiddleware(redisClient, cfg.WAF.HTTPFlood.MaxRequestsPerMinute, time.Minute))
 	wafRouter.Use(middleware.IPBlockerMiddleware(db))
+	wafRouter.Use(middleware.RegionFilter(db, geoIPService))
 	wafRouter.Use(middleware.BotDetectorMiddleware(db))
 	wafRouter.Use(middleware.LoggingMiddleware(db))
 
@@ -234,13 +238,13 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 }
 
 func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *services.NginxConfigService,
-	vhostService *services.VHostService, certService *services.CertificateService, authService *services.AuthService) *http.Server {
+	vhostService *services.VHostService, certService *services.CertificateService, authService *services.AuthService, reverseProxyHandler *proxy.ReverseProxy) *http.Server {
 
 	// Initialize email service
 	emailService := services.NewEmailService(db)
 
 	// Initialize API handlers
-	vhostHandler := api.NewVHostHandler(db, nginxConfigService, vhostService, certService)
+	vhostHandler := api.NewVHostHandler(db, nginxConfigService, vhostService, certService, reverseProxyHandler)
 	ipGroupHandler := api.NewIPGroupHandler(db)
 	dashboardHandler := api.NewDashboardHandler(db)
 	authHandler := api.NewAuthHandler(authService, emailService, cfg)
@@ -370,7 +374,7 @@ func main() {
 
 	// Start servers
 	wafServer := setupWAFServer(cfg, redisClient, db, reverseProxyHandler)
-	adminServer := setupAdminServer(cfg, db, nginxConfigService, vhostService, certService, authService)
+	adminServer := setupAdminServer(cfg, db, nginxConfigService, vhostService, certService, authService, reverseProxyHandler)
 
 	// Wait for shutdown signal
 	gracefulShutdown(wafServer, adminServer)

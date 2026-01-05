@@ -81,15 +81,15 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://www.google.com https://www.gstatic.com; frame-src 'self' https://challenges.cloudflare.com https://www.google.com; connect-src 'self' https://challenges.cloudflare.com https://www.google.com" always;
     {{end}}
 
     # Access and Error Logs
     access_log /var/log/nginx/{{.Domain}}_access.log;
     error_log /var/log/nginx/{{.Domain}}_error.log warn;
     
-    # Security: Deny access to hidden files
-    location ~ /\. {
+    # Security: Deny access to hidden files (except .well-known and .vite for dev)
+    location ~ /\.(?!well-known|vite) {
         deny all;
         access_log off;
         log_not_found off;
