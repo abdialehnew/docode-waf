@@ -400,6 +400,21 @@ const VHosts = () => {
     return 'text-green-600'
   }
 
+  // Helper function for backend check status color
+  const getBackendCheckColor = (status) => {
+    if (status === 'success') return 'text-green-600'
+    if (status === 'error') return 'text-red-600'
+    return 'text-blue-600'
+  }
+
+  // Helper function for location backend check color
+  const getLocationCheckColor = (status) => {
+    if (status === 'success') return 'text-green-600'
+    if (status === 'error') return 'text-red-600'
+    if (status === 'warning') return 'text-yellow-600'
+    return 'text-blue-600'
+  }
+
   const SortIcon = ({ field }) => {
     if (sortField !== field) return <ChevronsUpDown className="w-4 h-4 text-gray-400" />
     return sortOrder === 'asc' 
