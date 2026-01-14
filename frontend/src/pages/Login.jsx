@@ -23,6 +23,7 @@ const Login = () => {
   });
   const [turnstileConfig, setTurnstileConfig] = useState({
     enabled: false,
+    login_enabled: false,
     site_key: ''
   });
   const [turnstileToken, setTurnstileToken] = useState('');
@@ -70,7 +71,7 @@ const Login = () => {
     setError('');
 
     // Validate Turnstile if enabled
-    if (turnstileConfig.enabled && !turnstileToken) {
+    if (turnstileConfig.login_enabled && !turnstileToken) {
       setError('Please complete the captcha verification');
       setLoading(false);
       return;
@@ -95,9 +96,9 @@ const Login = () => {
         <div className="text-center mb-8">
           {appSettings.app_logo ? (
             <div className="flex justify-center mb-4">
-              <img 
-                src={appSettings.app_logo} 
-                alt={appSettings.app_name} 
+              <img
+                src={appSettings.app_logo}
+                alt={appSettings.app_name}
                 className="h-16 w-auto object-contain"
               />
             </div>
@@ -177,7 +178,7 @@ const Login = () => {
             </div>
 
             {/* Cloudflare Turnstile */}
-            {turnstileConfig.enabled && (
+            {turnstileConfig.login_enabled && (
               <Turnstile
                 siteKey={turnstileConfig.site_key}
                 onVerify={setTurnstileToken}
@@ -190,7 +191,7 @@ const Login = () => {
 
             <button
               type="submit"
-              disabled={loading || (turnstileConfig.enabled && !turnstileToken)}
+              disabled={loading || (turnstileConfig.login_enabled && !turnstileToken)}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign In'}

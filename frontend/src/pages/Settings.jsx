@@ -14,7 +14,10 @@ const Settings = () => {
     smtp_password: '',
     smtp_from_email: '',
     smtp_from_name: 'Docode WAF',
-    smtp_use_tls: true
+    smtp_use_tls: true,
+    turnstile_enabled: false,
+    turnstile_login_enabled: false,
+    turnstile_register_enabled: false
   })
   const [logoPreview, setLogoPreview] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -46,7 +49,7 @@ const Settings = () => {
         alert('Please select an image file')
         return
       }
-      
+
       // Validate file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         alert('Logo file size must be less than 2MB')
@@ -91,7 +94,7 @@ const Settings = () => {
         {/* Application Settings */}
         <div className="card lg:col-span-2">
           <h2 className="text-xl font-semibold mb-4">Application Settings</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
@@ -113,9 +116,9 @@ const Settings = () => {
                 <div className="space-y-3">
                   {logoPreview ? (
                     <div className="relative inline-block">
-                      <img 
-                        src={logoPreview} 
-                        alt="Logo preview" 
+                      <img
+                        src={logoPreview}
+                        alt="Logo preview"
                         className="h-20 w-20 object-contain border border-gray-300 rounded-lg p-2 bg-white"
                       />
                       <button
@@ -132,7 +135,7 @@ const Settings = () => {
                       <p className="text-sm text-gray-600">No logo uploaded</p>
                     </div>
                   )}
-                  
+
                   <div>
                     <input
                       type="file"
@@ -156,7 +159,7 @@ const Settings = () => {
             </div>
           </div>
 
-          <button 
+          <button
             onClick={handleSaveAppSettings}
             disabled={loading}
             className="btn btn-primary w-full mt-6 disabled:opacity-50"
@@ -168,14 +171,14 @@ const Settings = () => {
         {/* Authentication Settings */}
         <div className="card lg:col-span-2">
           <h2 className="text-xl font-semibold mb-4">Authentication Settings</h2>
-          
+
           <div className="space-y-4">
             <div>
               <label className="label">User Registration</label>
               <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="signup-enabled" 
+                <input
+                  type="checkbox"
+                  id="signup-enabled"
                   checked={appSettings.signup_enabled}
                   onChange={(e) => setAppSettings({ ...appSettings, signup_enabled: e.target.checked })}
                 />
@@ -190,13 +193,86 @@ const Settings = () => {
           </div>
         </div>
 
+        {/* Turnstile (CAPTCHA) Settings */}
+        <div className="card lg:col-span-2">
+          <h2 className="text-xl font-semibold mb-4">Cloudflare Turnstile (CAPTCHA)</h2>
+
+          <p className="text-sm text-gray-600 mb-4">
+            Configure Turnstile CAPTCHA verification on login and registration pages to protect against bots.
+            Note: Turnstile Site Key and Secret Key must be configured via environment variables.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="label">Global Turnstile</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="turnstile-enabled"
+                  checked={appSettings.turnstile_enabled}
+                  onChange={(e) => setAppSettings({ ...appSettings, turnstile_enabled: e.target.checked })}
+                />
+                <label htmlFor="turnstile-enabled" className="text-sm">
+                  Enable Turnstile CAPTCHA verification
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Master switch to enable/disable Turnstile on all pages. Individual page settings below only apply if this is enabled.
+              </p>
+            </div>
+
+            <div className={`pl-6 space-y-3 ${!appSettings.turnstile_enabled ? 'opacity-50' : ''}`}>
+              <div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="turnstile-login-enabled"
+                    checked={appSettings.turnstile_login_enabled}
+                    onChange={(e) => setAppSettings({ ...appSettings, turnstile_login_enabled: e.target.checked })}
+                    disabled={!appSettings.turnstile_enabled}
+                  />
+                  <label htmlFor="turnstile-login-enabled" className="text-sm">
+                    Enable Turnstile on Login page
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="turnstile-register-enabled"
+                    checked={appSettings.turnstile_register_enabled}
+                    onChange={(e) => setAppSettings({ ...appSettings, turnstile_register_enabled: e.target.checked })}
+                    disabled={!appSettings.turnstile_enabled}
+                  />
+                  <label htmlFor="turnstile-register-enabled" className="text-sm">
+                    Enable Turnstile on Registration page
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+            <h3 className="text-sm font-semibold text-yellow-900 mb-2">Environment Variables Required:</h3>
+            <ul className="text-xs text-yellow-800 space-y-1">
+              <li><code className="bg-yellow-100 px-1 rounded">TURNSTILE_SITE_KEY</code> - Your Cloudflare Turnstile site key</li>
+              <li><code className="bg-yellow-100 px-1 rounded">TURNSTILE_SECRET_KEY</code> - Your Cloudflare Turnstile secret key</li>
+            </ul>
+            <p className="text-xs text-yellow-700 mt-2">
+              Get your keys from <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer" className="underline">Cloudflare Dashboard</a>
+            </p>
+          </div>
+        </div>
+
         {/* SMTP Settings */}
         <div className="card lg:col-span-2">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <Mail className="w-5 h-5" />
             SMTP Configuration (Email Sending)
           </h2>
-          
+
           <p className="text-sm text-gray-600 mb-4">
             Configure SMTP settings to enable email notifications (password reset, alerts, etc.)
           </p>
@@ -281,9 +357,9 @@ const Settings = () => {
 
             <div className="md:col-span-2">
               <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="smtp-use-tls" 
+                <input
+                  type="checkbox"
+                  id="smtp-use-tls"
                   checked={appSettings.smtp_use_tls}
                   onChange={(e) => setAppSettings({ ...appSettings, smtp_use_tls: e.target.checked })}
                 />
@@ -308,7 +384,7 @@ const Settings = () => {
         {/* Keep existing WAF Configuration card */}
         <div className="card">
           <h2 className="text-xl font-semibold mb-4">WAF Configuration</h2>
-          
+
           <div className="space-y-4">
             <div>
               <label className="label">Rate Limiting</label>
@@ -354,7 +430,7 @@ const Settings = () => {
 
         <div className="card">
           <h2 className="text-xl font-semibold mb-4">SSL/TLS Settings</h2>
-          
+
           <div className="space-y-4">
             <div>
               <label className="label">Auto SSL</label>
@@ -382,7 +458,7 @@ const Settings = () => {
 
         <div className="card">
           <h2 className="text-xl font-semibold mb-4">Database Settings</h2>
-          
+
           <div className="space-y-4">
             <div>
               <label className="label">Host</label>
@@ -419,7 +495,7 @@ const Settings = () => {
 
         <div className="card">
           <h2 className="text-xl font-semibold mb-4">Logging Settings</h2>
-          
+
           <div className="space-y-4">
             <div>
               <label className="label">Log Level</label>

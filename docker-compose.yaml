@@ -24,7 +24,9 @@ services:
       - ./migrations/006_add_recaptcha_version.sql:/docker-entrypoint-initdb.d/006_add_recaptcha_version.sql
       - ./migrations/006_add_smtp_and_signup_settings.sql:/docker-entrypoint-initdb.d/006_add_smtp_and_signup_settings.sql
       - ./migrations/007_add_region_filtering.sql:/docker-entrypoint-initdb.d/007_add_region_filtering.sql
+      - ./migrations/007_add_websocket_to_vhost_locations.sql:/docker-entrypoint-initdb.d/007_add_websocket_to_vhost_locations.sql
       - ./migrations/008_ip_groups_multiple_vhosts.sql:/docker-entrypoint-initdb.d/008_ip_groups_multiple_vhosts.sql
+      - ./migrations/008_add_turnstile_settings.sql:/docker-entrypoint-initdb.d/008_add_turnstile_settings.sql
     networks:
       - waf-network
 

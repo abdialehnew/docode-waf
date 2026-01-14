@@ -154,12 +154,9 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 	// Public Settings route (accessible without authentication)
 	apiV1.GET("/settings/app", settingsHandler.GetAppSettings)
 
-	// Public Turnstile site key
+	// Public Turnstile site key (checks database settings)
 	apiV1.GET("/turnstile/sitekey", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"site_key": cfg.Turnstile.SiteKey,
-			"enabled":  cfg.Turnstile.SiteKey != "" && cfg.Turnstile.SiteKey != "${TURNSTILE_SITE_KEY}",
-		})
+		settingsHandler.GetTurnstileConfig(c, cfg.Turnstile.SiteKey)
 	})
 
 	// Protected routes (require authentication)

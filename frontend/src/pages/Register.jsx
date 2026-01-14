@@ -23,6 +23,7 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [turnstileConfig, setTurnstileConfig] = useState({
     enabled: false,
+    register_enabled: false,
     site_key: ''
   });
   const [turnstileToken, setTurnstileToken] = useState('');
@@ -70,7 +71,7 @@ const Register = () => {
     }
 
     // Validate Turnstile if enabled
-    if (turnstileConfig.enabled && !turnstileToken) {
+    if (turnstileConfig.register_enabled && !turnstileToken) {
       setError('Please complete the captcha verification');
       setLoading(false);
       return;
@@ -235,7 +236,7 @@ const Register = () => {
             </div>
 
             {/* Cloudflare Turnstile */}
-            {turnstileConfig.enabled && (
+            {turnstileConfig.register_enabled && (
               <Turnstile
                 siteKey={turnstileConfig.site_key}
                 onVerify={setTurnstileToken}
@@ -247,7 +248,7 @@ const Register = () => {
 
             <button
               type="submit"
-              disabled={loading || success || (turnstileConfig.enabled && !turnstileToken)}
+              disabled={loading || success || (turnstileConfig.register_enabled && !turnstileToken)}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating account...' : 'Create Account'}
