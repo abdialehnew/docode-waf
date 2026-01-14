@@ -244,7 +244,7 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 	vhostHandler := api.NewVHostHandler(db, nginxConfigService, vhostService, certService, reverseProxyHandler)
 	ipGroupHandler := api.NewIPGroupHandler(db)
 	dashboardHandler := api.NewDashboardHandler(db)
-	authHandler := api.NewAuthHandler(authService, emailService, cfg)
+	authHandler := api.NewAuthHandler(authService, emailService, cfg, db)
 	certHandler := api.NewCertificateHandler(certService)
 	settingsHandler := api.NewSettingsHandler(db)
 	blockingHandler := api.NewBlockingRuleHandler(db)
