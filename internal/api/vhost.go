@@ -93,14 +93,15 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 
 	// Query custom locations for all vhosts
 	type CustomLocation struct {
-		VHostID      string  `db:"vhost_id"`
-		Path         string  `db:"path" json:"path"`
-		ProxyPass    *string `db:"proxy_pass" json:"proxy_pass"`
-		CustomConfig *string `db:"custom_config" json:"config"`
+		VHostID          string  `db:"vhost_id"`
+		Path             string  `db:"path" json:"path"`
+		ProxyPass        *string `db:"proxy_pass" json:"proxy_pass"`
+		CustomConfig     *string `db:"custom_config" json:"config"`
+		WebSocketEnabled bool    `db:"websocket_enabled" json:"websocket_enabled"`
 	}
 	var allLocations []CustomLocation
 	locQuery := `
-		SELECT vhost_id::text, path, proxy_pass, custom_config
+		SELECT vhost_id::text, path, proxy_pass, custom_config, COALESCE(websocket_enabled, false) as websocket_enabled
 		FROM vhost_locations
 		WHERE enabled = true
 		ORDER BY created_at ASC
@@ -114,9 +115,10 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 			locationMap[loc.VHostID] = []map[string]interface{}{}
 		}
 		locationMap[loc.VHostID] = append(locationMap[loc.VHostID], map[string]interface{}{
-			"path":       loc.Path,
-			"proxy_pass": loc.ProxyPass,
-			"config":     loc.CustomConfig,
+			"path":              loc.Path,
+			"proxy_pass":        loc.ProxyPass,
+			"config":            loc.CustomConfig,
+			"websocket_enabled": loc.WebSocketEnabled,
 		})
 	}
 
@@ -203,13 +205,14 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 
 	// Query custom locations
 	type CustomLocation struct {
-		Path         string  `db:"path" json:"path"`
-		ProxyPass    *string `db:"proxy_pass" json:"proxy_pass"`
-		CustomConfig *string `db:"custom_config" json:"config"`
+		Path             string  `db:"path" json:"path"`
+		ProxyPass        *string `db:"proxy_pass" json:"proxy_pass"`
+		CustomConfig     *string `db:"custom_config" json:"config"`
+		WebSocketEnabled bool    `db:"websocket_enabled" json:"websocket_enabled"`
 	}
 	var customLocations []CustomLocation
 	locQuery := `
-		SELECT path, proxy_pass, custom_config
+		SELECT path, proxy_pass, custom_config, COALESCE(websocket_enabled, false) as websocket_enabled
 		FROM vhost_locations
 		WHERE vhost_id = $1 AND enabled = true
 		ORDER BY created_at ASC
@@ -245,31 +248,31 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 // CreateVHost creates a new virtual host
 func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	var input struct {
-		Name                   string                 `json:"name" binding:"required"`
-		Domain                 string                 `json:"domain" binding:"required"`
-		BackendURL             string                 `json:"backend_url" binding:"required"`
-		SSLEnabled             bool                   `json:"ssl_enabled"`
-		SSLCertificateID       *string                `json:"ssl_certificate_id"`
-		SSLCertPath            string                 `json:"ssl_cert_path"`
-		SSLKeyPath             string                 `json:"ssl_key_path"`
-		Enabled                bool                   `json:"enabled"`
-		WebsocketEnabled       bool                   `json:"websocket_enabled"`
-		HTTPVersion            string                 `json:"http_version"`
-		TLSVersion             string                 `json:"tls_version"`
-		MaxUploadSize          int                    `json:"max_upload_size"`
-		ProxyReadTimeout       int                    `json:"proxy_read_timeout"`
-		ProxyConnectTimeout    int                    `json:"proxy_connect_timeout"`
-		BotDetectionEnabled    bool                   `json:"bot_detection_enabled"`
-		BotDetectionType       string                 `json:"bot_detection_type"`
-		RecaptchaVersion       string                 `json:"recaptcha_version"`
-		RateLimitEnabled       bool                   `json:"rate_limit_enabled"`
-		RateLimitRequests      int                    `json:"rate_limit_requests"`
-		RateLimitWindow        int                    `json:"rate_limit_window"`
-		RegionWhitelist        []string               `json:"region_whitelist"`
-		RegionBlacklist        []string               `json:"region_blacklist"`
-		RegionFilteringEnabled bool                   `json:"region_filtering_enabled"`
-		CustomHeaders          map[string]interface{} `json:"custom_headers"`
-		CustomLocations        []map[string]string    `json:"custom_locations"`
+		Name                   string                   `json:"name" binding:"required"`
+		Domain                 string                   `json:"domain" binding:"required"`
+		BackendURL             string                   `json:"backend_url" binding:"required"`
+		SSLEnabled             bool                     `json:"ssl_enabled"`
+		SSLCertificateID       *string                  `json:"ssl_certificate_id"`
+		SSLCertPath            string                   `json:"ssl_cert_path"`
+		SSLKeyPath             string                   `json:"ssl_key_path"`
+		Enabled                bool                     `json:"enabled"`
+		WebsocketEnabled       bool                     `json:"websocket_enabled"`
+		HTTPVersion            string                   `json:"http_version"`
+		TLSVersion             string                   `json:"tls_version"`
+		MaxUploadSize          int                      `json:"max_upload_size"`
+		ProxyReadTimeout       int                      `json:"proxy_read_timeout"`
+		ProxyConnectTimeout    int                      `json:"proxy_connect_timeout"`
+		BotDetectionEnabled    bool                     `json:"bot_detection_enabled"`
+		BotDetectionType       string                   `json:"bot_detection_type"`
+		RecaptchaVersion       string                   `json:"recaptcha_version"`
+		RateLimitEnabled       bool                     `json:"rate_limit_enabled"`
+		RateLimitRequests      int                      `json:"rate_limit_requests"`
+		RateLimitWindow        int                      `json:"rate_limit_window"`
+		RegionWhitelist        []string                 `json:"region_whitelist"`
+		RegionBlacklist        []string                 `json:"region_blacklist"`
+		RegionFilteringEnabled bool                     `json:"region_filtering_enabled"`
+		CustomHeaders          map[string]interface{}   `json:"custom_headers"`
+		CustomLocations        []map[string]interface{} `json:"custom_locations"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -362,16 +365,21 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	if len(input.CustomLocations) > 0 {
 		for _, loc := range input.CustomLocations {
 			locQuery := `
-				INSERT INTO vhost_locations (id, vhost_id, path, backend_url, proxy_pass, custom_config, enabled, created_at, updated_at)
-				VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, true, $6, $7)
+				INSERT INTO vhost_locations (id, vhost_id, path, backend_url, proxy_pass, custom_config, websocket_enabled, enabled, created_at, updated_at)
+				VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, true, $7, $8)
 			`
 			proxyPass := loc["proxy_pass"]
+			websocketEnabled := false
+			if wsEnabled, ok := loc["websocket_enabled"].(bool); ok {
+				websocketEnabled = wsEnabled
+			}
 			_, err := h.db.Exec(locQuery,
 				id,
 				loc["path"],
-				proxyPass,     // backend_url (required NOT NULL)
-				proxyPass,     // proxy_pass
-				loc["config"], // custom_config
+				proxyPass,        // backend_url (required NOT NULL)
+				proxyPass,        // proxy_pass
+				loc["config"],    // custom_config
+				websocketEnabled, // websocket_enabled
 				time.Now(),
 				time.Now(),
 			)
@@ -421,31 +429,31 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	id := c.Param("id")
 
 	var input struct {
-		Name                   string                 `json:"name"`
-		Domain                 string                 `json:"domain"`
-		BackendURL             string                 `json:"backend_url"`
-		SSLEnabled             bool                   `json:"ssl_enabled"`
-		SSLCertificateID       *string                `json:"ssl_certificate_id"`
-		SSLCertPath            string                 `json:"ssl_cert_path"`
-		SSLKeyPath             string                 `json:"ssl_key_path"`
-		Enabled                bool                   `json:"enabled"`
-		WebsocketEnabled       bool                   `json:"websocket_enabled"`
-		HTTPVersion            string                 `json:"http_version"`
-		TLSVersion             string                 `json:"tls_version"`
-		MaxUploadSize          int                    `json:"max_upload_size"`
-		ProxyReadTimeout       int                    `json:"proxy_read_timeout"`
-		ProxyConnectTimeout    int                    `json:"proxy_connect_timeout"`
-		BotDetectionEnabled    bool                   `json:"bot_detection_enabled"`
-		BotDetectionType       string                 `json:"bot_detection_type"`
-		RecaptchaVersion       string                 `json:"recaptcha_version"`
-		RateLimitEnabled       bool                   `json:"rate_limit_enabled"`
-		RateLimitRequests      int                    `json:"rate_limit_requests"`
-		RateLimitWindow        int                    `json:"rate_limit_window"`
-		RegionWhitelist        []string               `json:"region_whitelist"`
-		RegionBlacklist        []string               `json:"region_blacklist"`
-		RegionFilteringEnabled bool                   `json:"region_filtering_enabled"`
-		CustomHeaders          map[string]interface{} `json:"custom_headers"`
-		CustomLocations        []map[string]string    `json:"custom_locations"`
+		Name                   string                   `json:"name"`
+		Domain                 string                   `json:"domain"`
+		BackendURL             string                   `json:"backend_url"`
+		SSLEnabled             bool                     `json:"ssl_enabled"`
+		SSLCertificateID       *string                  `json:"ssl_certificate_id"`
+		SSLCertPath            string                   `json:"ssl_cert_path"`
+		SSLKeyPath             string                   `json:"ssl_key_path"`
+		Enabled                bool                     `json:"enabled"`
+		WebsocketEnabled       bool                     `json:"websocket_enabled"`
+		HTTPVersion            string                   `json:"http_version"`
+		TLSVersion             string                   `json:"tls_version"`
+		MaxUploadSize          int                      `json:"max_upload_size"`
+		ProxyReadTimeout       int                      `json:"proxy_read_timeout"`
+		ProxyConnectTimeout    int                      `json:"proxy_connect_timeout"`
+		BotDetectionEnabled    bool                     `json:"bot_detection_enabled"`
+		BotDetectionType       string                   `json:"bot_detection_type"`
+		RecaptchaVersion       string                   `json:"recaptcha_version"`
+		RateLimitEnabled       bool                     `json:"rate_limit_enabled"`
+		RateLimitRequests      int                      `json:"rate_limit_requests"`
+		RateLimitWindow        int                      `json:"rate_limit_window"`
+		RegionWhitelist        []string                 `json:"region_whitelist"`
+		RegionBlacklist        []string                 `json:"region_blacklist"`
+		RegionFilteringEnabled bool                     `json:"region_filtering_enabled"`
+		CustomHeaders          map[string]interface{}   `json:"custom_headers"`
+		CustomLocations        []map[string]interface{} `json:"custom_locations"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -537,16 +545,21 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	if len(input.CustomLocations) > 0 {
 		for _, loc := range input.CustomLocations {
 			locQuery := `
-				INSERT INTO vhost_locations (id, vhost_id, path, backend_url, proxy_pass, custom_config, enabled, created_at, updated_at)
-				VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, true, $6, $7)
+				INSERT INTO vhost_locations (id, vhost_id, path, backend_url, proxy_pass, custom_config, websocket_enabled, enabled, created_at, updated_at)
+				VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, true, $7, $8)
 			`
 			proxyPass := loc["proxy_pass"]
+			websocketEnabled := false
+			if wsEnabled, ok := loc["websocket_enabled"].(bool); ok {
+				websocketEnabled = wsEnabled
+			}
 			_, err := h.db.Exec(locQuery,
 				id,
 				loc["path"],
-				proxyPass,     // backend_url (required NOT NULL)
-				proxyPass,     // proxy_pass
-				loc["config"], // custom_config
+				proxyPass,        // backend_url (required NOT NULL)
+				proxyPass,        // proxy_pass
+				loc["config"],    // custom_config
+				websocketEnabled, // websocket_enabled
 				time.Now(),
 				time.Now(),
 			)

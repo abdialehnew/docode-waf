@@ -28,11 +28,11 @@ const VHosts = () => {
   const [selectedVHost, setSelectedVHost] = useState(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingVHostId, setEditingVHostId] = useState(null)
-  
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(12)
-  
+
   const [formData, setFormData] = useState({
     name: '',
     domain: '',
@@ -58,9 +58,9 @@ const VHosts = () => {
     custom_locations: [],
     custom_headers: {},
   })
-  
+
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
-  const [newLocation, setNewLocation] = useState({ path: '', proxy_pass: '', config: '' })
+  const [newLocation, setNewLocation] = useState({ path: '', proxy_pass: '', config: '', websocket_enabled: false })
   const [newHeader, setNewHeader] = useState({ key: '', value: '' })
   const [locationBackendCheck, setLocationBackendCheck] = useState({ status: null, message: '' })
 
@@ -187,7 +187,7 @@ const VHosts = () => {
 
     const timeoutId = setTimeout(async () => {
       try {
-        await fetch(newLocation.proxy_pass, { 
+        await fetch(newLocation.proxy_pass, {
           method: 'HEAD',
           mode: 'no-cors',
           cache: 'no-cache'
@@ -244,7 +244,7 @@ const VHosts = () => {
       setBackendCheckStatus(null)
       setBackendCheckMessage('')
       setShowAdvancedSettings(false)
-      setNewLocation({ path: '', proxy_pass: '', config: '' })
+      setNewLocation({ path: '', proxy_pass: '', config: '', websocket_enabled: false })
       setNewHeader({ key: '', value: '' })
       await loadVHosts()
     } catch (error) {
@@ -353,7 +353,7 @@ const VHosts = () => {
 
   // Filter and sort vhosts
   const filteredAndSortedVHosts = vhosts
-    .filter(vhost => 
+    .filter(vhost =>
       vhost.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       vhost.domain?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       vhost.backend_url?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -381,7 +381,7 @@ const VHosts = () => {
   }
 
   // Filter certificates by search term
-  const filteredCertificates = certificates.filter(cert => 
+  const filteredCertificates = certificates.filter(cert =>
     cert.name?.toLowerCase().includes(certSearchTerm.toLowerCase()) ||
     cert.common_name?.toLowerCase().includes(certSearchTerm.toLowerCase())
   )
@@ -393,8 +393,8 @@ const VHosts = () => {
   const getCertExpiryColor = (validToDate) => {
     const validTo = new Date(validToDate)
     const now = new Date()
-    const thirtyDaysFromNow = new Date(Date.now() + 30*24*60*60*1000)
-    
+    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+
     if (validTo < now) return 'text-red-600'
     if (validTo < thirtyDaysFromNow) return 'text-yellow-600'
     return 'text-green-600'
@@ -417,7 +417,7 @@ const VHosts = () => {
 
   const SortIcon = ({ field }) => {
     if (sortField !== field) return <ChevronsUpDown className="w-4 h-4 text-gray-400" />
-    return sortOrder === 'asc' 
+    return sortOrder === 'asc'
       ? <ChevronUp className="w-4 h-4 text-primary-600" />
       : <ChevronDown className="w-4 h-4 text-primary-600" />
   }
@@ -467,7 +467,7 @@ const VHosts = () => {
               }}
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             {selectedVHosts.length > 0 && (
               <button
@@ -478,7 +478,7 @@ const VHosts = () => {
                 Delete ({selectedVHosts.length})
               </button>
             )}
-            
+
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('grid')}
@@ -532,7 +532,7 @@ const VHosts = () => {
                   className="w-4 h-4 rounded border-gray-300"
                 />
               </div>
-              
+
               <div className="flex items-start justify-between mb-4 ml-8">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary-100 rounded-lg">
@@ -540,7 +540,7 @@ const VHosts = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold">{vhost.name}</h3>
-                    <a 
+                    <a
                       href={`${vhost.ssl_enabled ? 'https' : 'http'}://${vhost.domain}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -595,11 +595,10 @@ const VHosts = () => {
                       SSL
                     </span>
                   )}
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    vhost.enabled
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span className={`px-2 py-1 rounded text-xs ${vhost.enabled
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-gray-100 text-gray-800'
+                    }`}>
                     {vhost.enabled ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
@@ -624,7 +623,7 @@ const VHosts = () => {
                       className="w-4 h-4 rounded border-gray-300"
                     />
                   </th>
-                  <th 
+                  <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('name')}
                   >
@@ -633,7 +632,7 @@ const VHosts = () => {
                       <SortIcon field="name" />
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('domain')}
                   >
@@ -648,7 +647,7 @@ const VHosts = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     SSL
                   </th>
-                  <th 
+                  <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('enabled')}
                   >
@@ -680,7 +679,7 @@ const VHosts = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <a 
+                      <a
                         href={`${vhost.ssl_enabled ? 'https' : 'http'}://${vhost.domain}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -705,11 +704,10 @@ const VHosts = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        vhost.enabled
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span className={`px-2 py-1 rounded text-xs ${vhost.enabled
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                        }`}>
                         {vhost.enabled ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -750,7 +748,7 @@ const VHosts = () => {
               </tbody>
             </table>
           </div>
-          
+
           {filteredAndSortedVHosts.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               No virtual hosts found
@@ -781,7 +779,7 @@ const VHosts = () => {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              
+
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                 if (
                   page === 1 ||
@@ -792,11 +790,10 @@ const VHosts = () => {
                     <button
                       key={page}
                       onClick={() => handlePageChange(page)}
-                      className={`px-3 py-1 rounded transition ${
-                        page === currentPage
-                          ? 'bg-blue-600 text-white'
-                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
+                      className={`px-3 py-1 rounded transition ${page === currentPage
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
                     >
                       {page}
                     </button>
@@ -911,7 +908,7 @@ const VHosts = () => {
                       className="input w-full text-left flex items-center justify-between"
                     >
                       <span className={selectedCertificate ? 'text-gray-900' : 'text-gray-400'}>
-                        {selectedCertificate 
+                        {selectedCertificate
                           ? `${selectedCertificate.name} - Expires: ${new Date(selectedCertificate.valid_to).toLocaleDateString()}`
                           : 'Select SSL Certificate'
                         }
@@ -952,9 +949,8 @@ const VHosts = () => {
                                   setShowCertDropdown(false)
                                   setCertSearchTerm('')
                                 }}
-                                className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors ${
-                                  formData.ssl_certificate_id === cert.id ? 'bg-primary-50' : ''
-                                }`}
+                                className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors ${formData.ssl_certificate_id === cert.id ? 'bg-primary-50' : ''
+                                  }`}
                               >
                                 <div className="text-sm font-medium text-gray-900">{cert.name}</div>
                                 <div className="text-xs text-gray-500 mt-0.5">
@@ -1116,7 +1112,7 @@ const VHosts = () => {
                               <option value="v3">v3 (Invisible - Score based)</option>
                             </select>
                             <p className="text-xs text-gray-500 mt-1">
-                              {formData.recaptcha_version === 'v3' 
+                              {formData.recaptcha_version === 'v3'
                                 ? 'v3: Invisible challenge with automatic scoring (0.0-1.0)'
                                 : 'v2: Visible checkbox with manual verification'}
                             </p>
@@ -1305,7 +1301,14 @@ const VHosts = () => {
                       {(formData.custom_locations || []).map((loc, index) => (
                         <div key={index} className="border border-gray-300 rounded-lg p-3 bg-white">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700">location {loc.path}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-700">location {loc.path}</span>
+                              {loc.websocket_enabled && (
+                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                                  WebSocket
+                                </span>
+                              )}
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
@@ -1326,7 +1329,7 @@ const VHosts = () => {
                           )}
                         </div>
                       ))}
-                      
+
                       {/* Add New Location */}
                       <div className="border border-dashed border-gray-300 rounded-lg p-3 bg-white">
                         <div className="space-y-2">
@@ -1374,6 +1377,16 @@ const VHosts = () => {
                             value={newLocation.config}
                             onChange={(e) => setNewLocation({ ...newLocation, config: e.target.value })}
                           />
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                              checked={newLocation.websocket_enabled || false}
+                              onChange={(e) => setNewLocation({ ...newLocation, websocket_enabled: e.target.checked })}
+                            />
+                            <span className="text-sm text-gray-700">Enable WebSocket Support</span>
+                            <span className="text-xs text-gray-500">(Adds Upgrade/Connection headers)</span>
+                          </label>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1384,7 +1397,7 @@ const VHosts = () => {
                                   ...formData,
                                   custom_locations: [...(formData.custom_locations || []), { ...newLocation }]
                                 })
-                                setNewLocation({ path: '', proxy_pass: '', config: '' })
+                                setNewLocation({ path: '', proxy_pass: '', config: '', websocket_enabled: false })
                                 setLocationBackendCheck({ status: null, message: '' })
                               }
                             }}
@@ -1431,7 +1444,7 @@ const VHosts = () => {
                       custom_headers: {},
                     })
                     setShowAdvancedSettings(false)
-                    setNewLocation({ path: '', proxy_pass: '', config: '' })
+                    setNewLocation({ path: '', proxy_pass: '', config: '', websocket_enabled: false })
                     setNewHeader({ key: '', value: '' })
                   }}
                   className="btn btn-secondary flex-1"
@@ -1446,12 +1459,12 @@ const VHosts = () => {
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           role="dialog"
           aria-modal="true"
         >
-          <div 
+          <div
             className="bg-white rounded-lg p-6 w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1520,7 +1533,7 @@ const VHosts = () => {
                 </div>
                 <div>
                   <label className="text-sm font-semibold text-gray-600">Domain</label>
-                  <a 
+                  <a
                     href={`${selectedVHost.ssl_enabled ? 'https' : 'http'}://${selectedVHost.domain}`}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1555,11 +1568,10 @@ const VHosts = () => {
                 <div>
                   <label className="text-sm font-semibold text-gray-600">Status</label>
                   <div className="mt-1">
-                    <span className={`px-3 py-1 rounded text-sm font-medium ${
-                      selectedVHost.enabled
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-3 py-1 rounded text-sm font-medium ${selectedVHost.enabled
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                      }`}>
                       {selectedVHost.enabled ? 'Active' : 'Inactive'}
                     </span>
                   </div>
@@ -1623,10 +1635,10 @@ const VHosts = () => {
             <div className="relative">
               {/* Outer spinning ring */}
               <div className="absolute inset-0 rounded-full border-4 border-primary-200 border-t-primary-600 animate-spin w-24 h-24"></div>
-              
+
               {/* Middle pulsing ring */}
               <div className="absolute inset-2 rounded-full bg-primary-100 animate-pulse"></div>
-              
+
               {/* Logo in center */}
               <div className="relative w-24 h-24 flex items-center justify-center">
                 <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-full p-4 shadow-lg">
@@ -1634,7 +1646,7 @@ const VHosts = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Loading text */}
             <div className="text-center">
               <h3 className="text-lg font-semibold text-gray-900 mb-1">
@@ -1642,7 +1654,7 @@ const VHosts = () => {
               </h3>
               <p className="text-sm text-gray-500">Please wait</p>
             </div>
-            
+
             {/* Progress dots */}
             <div className="flex gap-2">
               <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>

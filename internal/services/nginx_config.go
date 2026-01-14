@@ -29,9 +29,10 @@ type VHostWithLocations struct {
 }
 
 type CustomLocation struct {
-	Path         string
-	ProxyPass    string
-	CustomConfig string
+	Path             string
+	ProxyPass        string
+	CustomConfig     string
+	WebSocketEnabled bool
 }
 
 // VHostTemplate is the nginx configuration template for a virtual host
@@ -137,9 +138,13 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        {{if .WebSocketEnabled}}
+        # WebSocket Support
         proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        {{end}}{{if .CustomConfig}}{{.CustomConfig}}{{end}}
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        {{else}}proxy_set_header Connection "";
+        {{end}}{{end}}{{if .CustomConfig}}{{.CustomConfig}}{{end}}
     }
 {{end}}
     # Proxy to WAF - All requests go through WAF middleware first
@@ -205,13 +210,14 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 	// Fetch custom locations from database if db is available
 	if s.db != nil {
 		var locations []struct {
-			Path         string `db:"path"`
-			ProxyPass    string `db:"proxy_pass"`
-			CustomConfig string `db:"custom_config"`
+			Path             string `db:"path"`
+			ProxyPass        string `db:"proxy_pass"`
+			CustomConfig     string `db:"custom_config"`
+			WebSocketEnabled bool   `db:"websocket_enabled"`
 		}
 
 		query := `
-			SELECT path, COALESCE(proxy_pass, '') as proxy_pass, COALESCE(custom_config, '') as custom_config
+			SELECT path, COALESCE(proxy_pass, '') as proxy_pass, COALESCE(custom_config, '') as custom_config, COALESCE(websocket_enabled, false) as websocket_enabled
 			FROM vhost_locations
 			WHERE vhost_id = $1 AND enabled = true
 			ORDER BY length(path) DESC
@@ -220,9 +226,10 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 		if err := s.db.Select(&locations, query, vhost.ID); err == nil {
 			for _, loc := range locations {
 				vhostWithLocs.CustomLocations = append(vhostWithLocs.CustomLocations, CustomLocation{
-					Path:         loc.Path,
-					ProxyPass:    loc.ProxyPass,
-					CustomConfig: loc.CustomConfig,
+					Path:             loc.Path,
+					ProxyPass:        loc.ProxyPass,
+					CustomConfig:     loc.CustomConfig,
+					WebSocketEnabled: loc.WebSocketEnabled,
 				})
 			}
 		}
