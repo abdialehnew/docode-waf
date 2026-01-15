@@ -27,6 +27,7 @@ services:
       - ./migrations/007_add_websocket_to_vhost_locations.sql:/docker-entrypoint-initdb.d/007_add_websocket_to_vhost_locations.sql
       - ./migrations/008_ip_groups_multiple_vhosts.sql:/docker-entrypoint-initdb.d/008_ip_groups_multiple_vhosts.sql
       - ./migrations/008_add_turnstile_settings.sql:/docker-entrypoint-initdb.d/008_add_turnstile_settings.sql
+      - ./migrations/009_add_multiple_backends.sql:/docker-entrypoint-initdb.d/009_add_multiple_backends.sql
     networks:
       - waf-network
 

@@ -49,6 +49,9 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 		Name                string          `db:"name" json:"name"`
 		Domain              string          `db:"domain" json:"domain"`
 		BackendURL          string          `db:"backend_url" json:"backend_url"`
+		Backends            *string         `db:"backends" json:"backends"`
+		LoadBalanceMethod   *string         `db:"load_balance_method" json:"load_balance_method"`
+		CustomConfig        *string         `db:"custom_config" json:"custom_config"`
 		SSLEnabled          bool            `db:"ssl_enabled" json:"ssl_enabled"`
 		SSLCertificateID    *string         `db:"ssl_certificate_id" json:"ssl_certificate_id"`
 		SSLCertPath         *string         `db:"ssl_cert_path" json:"ssl_cert_path"`
@@ -74,8 +77,9 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 	var vhosts []VHost
 
 	query := `
-		SELECT id::text, name, domain, backend_url, ssl_enabled, 
-		       ssl_certificate_id::text, ssl_cert_path, ssl_key_path, enabled,
+		SELECT id::text, name, domain, backend_url, 
+		       backends::text as backends, COALESCE(load_balance_method, 'round_robin') as load_balance_method, custom_config,
+		       ssl_enabled, ssl_certificate_id::text, ssl_cert_path, ssl_key_path, enabled,
 		       websocket_enabled, http_version, tls_version, max_upload_size,
 		       proxy_read_timeout, proxy_connect_timeout,
 		       bot_detection_enabled, bot_detection_type, recaptcha_version,
@@ -129,11 +133,34 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 		if customLocs == nil {
 			customLocs = []map[string]interface{}{}
 		}
+
+		// Parse backends from JSON
+		var backends []string
+		if vhost.Backends != nil && *vhost.Backends != "" && *vhost.Backends != "[]" {
+			_ = json.Unmarshal([]byte(*vhost.Backends), &backends)
+		}
+		if backends == nil {
+			backends = []string{}
+		}
+
+		loadBalanceMethod := "round_robin"
+		if vhost.LoadBalanceMethod != nil {
+			loadBalanceMethod = *vhost.LoadBalanceMethod
+		}
+
+		customConfig := ""
+		if vhost.CustomConfig != nil {
+			customConfig = *vhost.CustomConfig
+		}
+
 		response = append(response, map[string]interface{}{
 			"id":                    vhost.ID,
 			"name":                  vhost.Name,
 			"domain":                vhost.Domain,
 			"backend_url":           vhost.BackendURL,
+			"backends":              backends,
+			"load_balance_method":   loadBalanceMethod,
+			"custom_config":         customConfig,
 			"ssl_enabled":           vhost.SSLEnabled,
 			"ssl_certificate_id":    vhost.SSLCertificateID,
 			"ssl_cert_path":         vhost.SSLCertPath,
@@ -251,6 +278,9 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		Name                   string                   `json:"name" binding:"required"`
 		Domain                 string                   `json:"domain" binding:"required"`
 		BackendURL             string                   `json:"backend_url" binding:"required"`
+		Backends               []string                 `json:"backends"`
+		LoadBalanceMethod      string                   `json:"load_balance_method"`
+		CustomConfig           string                   `json:"custom_config"`
 		SSLEnabled             bool                     `json:"ssl_enabled"`
 		SSLCertificateID       *string                  `json:"ssl_certificate_id"`
 		SSLCertPath            string                   `json:"ssl_cert_path"`
@@ -313,16 +343,31 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		return
 	}
 
+	// Marshal backends to JSON
+	if input.Backends == nil {
+		input.Backends = []string{}
+	}
+	backendsJSON, err := json.Marshal(input.Backends)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid backends format"})
+		return
+	}
+
+	// Set default load balance method
+	if input.LoadBalanceMethod == "" {
+		input.LoadBalanceMethod = "round_robin"
+	}
+
 	query := `
-		INSERT INTO vhosts (id, name, domain, backend_url, ssl_enabled, 
-		                   ssl_certificate_id, ssl_cert_path, ssl_key_path, enabled,
+		INSERT INTO vhosts (id, name, domain, backend_url, backends, load_balance_method, custom_config,
+		                   ssl_enabled, ssl_certificate_id, ssl_cert_path, ssl_key_path, enabled,
 		                   websocket_enabled, http_version, tls_version, max_upload_size,
 		                   proxy_read_timeout, proxy_connect_timeout,
 		                   bot_detection_enabled, bot_detection_type, recaptcha_version,
 		                   rate_limit_enabled, rate_limit_requests, rate_limit_window,
 		                   region_whitelist, region_blacklist, region_filtering_enabled,
 		                   custom_headers, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
 		RETURNING id
 	`
 
@@ -331,6 +376,9 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		input.Name,
 		input.Domain,
 		input.BackendURL,
+		backendsJSON,
+		input.LoadBalanceMethod,
+		input.CustomConfig,
 		input.SSLEnabled,
 		input.SSLCertificateID,
 		input.SSLCertPath,
@@ -432,6 +480,9 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		Name                   string                   `json:"name"`
 		Domain                 string                   `json:"domain"`
 		BackendURL             string                   `json:"backend_url"`
+		Backends               []string                 `json:"backends"`
+		LoadBalanceMethod      string                   `json:"load_balance_method"`
+		CustomConfig           string                   `json:"custom_config"`
 		SSLEnabled             bool                     `json:"ssl_enabled"`
 		SSLCertificateID       *string                  `json:"ssl_certificate_id"`
 		SSLCertPath            string                   `json:"ssl_cert_path"`
@@ -463,15 +514,15 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 
 	query := `
 		UPDATE vhosts 
-		SET name = $1, domain = $2, backend_url = $3, ssl_enabled = $4,
-		    ssl_certificate_id = $5, ssl_cert_path = $6, ssl_key_path = $7, enabled = $8,
-		    websocket_enabled = $9, http_version = $10, tls_version = $11, max_upload_size = $12,
-		    proxy_read_timeout = $13, proxy_connect_timeout = $14,
-		    bot_detection_enabled = $15, bot_detection_type = $16, recaptcha_version = $17,
-		    rate_limit_enabled = $18, rate_limit_requests = $19, rate_limit_window = $20,
-		    region_whitelist = $21, region_blacklist = $22, region_filtering_enabled = $23,
-		    custom_headers = $24, updated_at = $25
-		WHERE id = $26
+		SET name = $1, domain = $2, backend_url = $3, backends = $4, load_balance_method = $5, custom_config = $6,
+		    ssl_enabled = $7, ssl_certificate_id = $8, ssl_cert_path = $9, ssl_key_path = $10, enabled = $11,
+		    websocket_enabled = $12, http_version = $13, tls_version = $14, max_upload_size = $15,
+		    proxy_read_timeout = $16, proxy_connect_timeout = $17,
+		    bot_detection_enabled = $18, bot_detection_type = $19, recaptcha_version = $20,
+		    rate_limit_enabled = $21, rate_limit_requests = $22, rate_limit_window = $23,
+		    region_whitelist = $24, region_blacklist = $25, region_filtering_enabled = $26,
+		    custom_headers = $27, updated_at = $28
+		WHERE id = $29
 	`
 
 	// Set defaults
@@ -490,6 +541,12 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	if input.CustomHeaders == nil {
 		input.CustomHeaders = make(map[string]interface{})
 	}
+	if input.Backends == nil {
+		input.Backends = []string{}
+	}
+	if input.LoadBalanceMethod == "" {
+		input.LoadBalanceMethod = "round_robin"
+	}
 
 	// Marshal custom_headers to JSON
 	customHeadersJSON, err := json.Marshal(input.CustomHeaders)
@@ -498,10 +555,20 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		return
 	}
 
+	// Marshal backends to JSON
+	backendsJSON, err := json.Marshal(input.Backends)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid backends format"})
+		return
+	}
+
 	_, err = h.db.Exec(query,
 		input.Name,
 		input.Domain,
 		input.BackendURL,
+		backendsJSON,
+		input.LoadBalanceMethod,
+		input.CustomConfig,
 		input.SSLEnabled,
 		input.SSLCertificateID,
 		input.SSLCertPath,

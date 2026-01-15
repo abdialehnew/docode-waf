@@ -37,6 +37,9 @@ const VHosts = () => {
     name: '',
     domain: '',
     backend_url: '',
+    backends: [],
+    load_balance_method: 'round_robin',
+    custom_config: '',
     ssl_enabled: false,
     ssl_certificate_id: '',
     enabled: true,
@@ -327,6 +330,9 @@ const VHosts = () => {
       name: vhost.name || '',
       domain: vhost.domain || '',
       backend_url: vhost.backend_url || '',
+      backends: vhost.backends || [],
+      load_balance_method: vhost.load_balance_method || 'round_robin',
+      custom_config: vhost.custom_config || '',
       ssl_enabled: vhost.ssl_enabled || false,
       ssl_certificate_id: vhost.ssl_certificate_id || '',
       enabled: vhost.enabled === undefined ? true : vhost.enabled,
@@ -878,6 +884,83 @@ const VHosts = () => {
                     {backendCheckMessage}
                   </p>
                 )}
+              </div>
+
+              {/* Multiple Backends Section */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="label text-sm font-medium">Multiple Backends (Load Balancing)</label>
+                  <span className="text-xs text-gray-500">Optional - for high availability</span>
+                </div>
+
+                {/* Existing backends list */}
+                {formData.backends && formData.backends.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {formData.backends.map((backend, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          className="input flex-1 text-sm"
+                          value={backend}
+                          onChange={(e) => {
+                            const newBackends = [...formData.backends]
+                            newBackends[index] = e.target.value
+                            setFormData({ ...formData, backends: newBackends })
+                          }}
+                          placeholder="http://backend:8080"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newBackends = formData.backends.filter((_, i) => i !== index)
+                            setFormData({ ...formData, backends: newBackends })
+                          }}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add backend button */}
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, backends: [...(formData.backends || []), ''] })}
+                  className="btn btn-secondary text-xs flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" /> Add Backend Server
+                </button>
+
+                {/* Load Balance Method */}
+                {formData.backends && formData.backends.length > 0 && (
+                  <div className="mt-3">
+                    <label className="label text-sm">Load Balancing Method</label>
+                    <select
+                      className="input text-sm"
+                      value={formData.load_balance_method}
+                      onChange={(e) => setFormData({ ...formData, load_balance_method: e.target.value })}
+                    >
+                      <option value="round_robin">Round Robin (default)</option>
+                      <option value="least_conn">Least Connections</option>
+                      <option value="ip_hash">IP Hash (sticky sessions)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Custom Nginx Config */}
+              <div>
+                <label className="label">Custom Nginx Configuration</label>
+                <textarea
+                  className="input font-mono text-sm"
+                  rows={3}
+                  placeholder="client_max_body_size 100m;&#10;proxy_buffering off;"
+                  value={formData.custom_config}
+                  onChange={(e) => setFormData({ ...formData, custom_config: e.target.value })}
+                />
+                <p className="text-xs text-gray-500 mt-1">Additional nginx directives for this vhost</p>
               </div>
 
               <div className="flex items-center gap-2">
