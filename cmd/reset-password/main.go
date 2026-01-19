@@ -88,7 +88,7 @@ func main() {
 	}
 
 	// Update password
-	_, err = db.Exec("UPDATE admins SET password = $1, updated_at = NOW() WHERE id = $2", string(hashedPassword), adminID)
+	_, err = db.Exec("UPDATE admins SET password_hash = $1, updated_at = NOW() WHERE id = $2", string(hashedPassword), adminID)
 	if err != nil {
 		log.Fatalf("Failed to update password: %v", err)
 	}
