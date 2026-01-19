@@ -54,7 +54,7 @@ const Dashboard = () => {
       }
       const response = await getDashboardStats(params)
       setStats(response.data)
-      
+
       // Load country stats with same params
       const countryResponse = await getAttacksByCountry(params)
       setCountryStats(countryResponse.data || [])
@@ -107,10 +107,11 @@ const Dashboard = () => {
 
 
   // Filter and paginate attacks
-  const filteredAttacks = stats?.recent_attacks?.filter(attack => 
+  const filteredAttacks = stats?.recent_attacks?.filter(attack =>
     attack.client_ip?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     attack.attack_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    attack.url?.toLowerCase().includes(searchTerm.toLowerCase())
+    attack.url?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    attack.host?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
 
   const totalPages = Math.ceil(filteredAttacks.length / itemsPerPage)
@@ -154,7 +155,7 @@ const Dashboard = () => {
       {/* Header with Date Range Selector */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        
+
         <div className="flex items-center gap-4">
           {/* Time Range Selector */}
           <div className="flex items-center gap-2 bg-white border rounded-lg p-1">
@@ -162,11 +163,10 @@ const Dashboard = () => {
               <button
                 key={range}
                 onClick={() => handleRangeChange(range)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  timeRange === range
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === range
                     ? 'bg-blue-500 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 {range === 'custom' ? <Calendar className="w-4 h-4" /> : range.toUpperCase()}
               </button>
@@ -262,8 +262,8 @@ const Dashboard = () => {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={stats?.requests_by_hour || []}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="hour" 
+              <XAxis
+                dataKey="hour"
                 tickFormatter={formatXAxis}
               />
               <YAxis />
@@ -280,10 +280,10 @@ const Dashboard = () => {
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={stats?.top_attack_types || []} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="name" 
-                angle={-45} 
-                textAnchor="end" 
+              <XAxis
+                dataKey="name"
+                angle={-45}
+                textAnchor="end"
                 height={100}
                 interval={0}
                 style={{ fontSize: '12px' }}
@@ -374,9 +374,8 @@ const Dashboard = () => {
                         <div className="flex items-center gap-2">
                           <div className="w-full bg-gray-200 rounded-full h-2 max-w-[80px]">
                             <div
-                              className={`h-2 rounded-full ${
-                                blockRate >= 80 ? 'bg-green-500' : (blockRate >= 50 ? 'bg-yellow-500' : 'bg-red-500')
-                              }`}
+                              className={`h-2 rounded-full ${blockRate >= 80 ? 'bg-green-500' : (blockRate >= 50 ? 'bg-yellow-500' : 'bg-red-500')
+                                }`}
                               style={{ width: `${blockRate}%` }}
                             />
                           </div>
@@ -451,9 +450,8 @@ const Dashboard = () => {
                       {attack.url}
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        attack.blocked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                      }`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${attack.blocked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                        }`}>
                         {attack.blocked ? 'Blocked' : 'Allowed'}
                       </span>
                     </td>
@@ -469,7 +467,7 @@ const Dashboard = () => {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex justify-between items-center mt-4 pt-4 border-t">
@@ -488,9 +486,8 @@ const Dashboard = () => {
                 <button
                   key={i + 1}
                   onClick={() => setCurrentPage(i + 1)}
-                  className={`px-3 py-1 border rounded ${
-                    currentPage === i + 1 ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-1 border rounded ${currentPage === i + 1 ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'
+                    }`}
                 >
                   {i + 1}
                 </button>

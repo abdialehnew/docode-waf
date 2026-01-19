@@ -213,7 +213,7 @@ func (h *DashboardHandler) GetAttackLogs(c *gin.Context) {
 
 	query := `
 		SELECT id, timestamp, client_ip, method, url, status_code,
-		       attack_type, blocked, block_reason, user_agent
+		       attack_type, blocked, block_reason, user_agent, host
 		FROM traffic_logs 
 		WHERE is_attack = true
 		ORDER BY timestamp DESC 
@@ -285,7 +285,8 @@ func (h *DashboardHandler) GetRecentAttacks(c *gin.Context) {
 			attack_type,
 			url,
 			blocked,
-			user_agent
+			user_agent,
+			host
 		FROM traffic_logs 
 		WHERE is_attack = true
 		ORDER BY timestamp DESC 

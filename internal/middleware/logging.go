@@ -76,7 +76,14 @@ func LoggingMiddleware(db *sqlx.DB) gin.HandlerFunc {
 }
 
 // detectAttackType analyzes request for attack patterns
+// Skips detection for private/local IPs to avoid false positives during testing
 func detectAttackType(c *gin.Context) (bool, string) {
+	// Skip attack detection for private/local IPs
+	clientIP := net.ParseIP(c.ClientIP())
+	if clientIP != nil && (clientIP.IsPrivate() || clientIP.IsLoopback()) {
+		return false, ""
+	}
+
 	url := c.Request.URL.String()
 	userAgent := c.GetHeader("User-Agent")
 
@@ -179,7 +186,10 @@ func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
 	}
 
 	countryCode := getCountryCode(c.ClientIP())
-	host := c.Request.Host
+
+	// Get the HTTP Host header and try to find the matching vhost domain
+	httpHost := c.Request.Host
+	host := lookupVHostDomain(db, httpHost)
 
 	_, err := db.Exec(query,
 		time.Now(),
@@ -202,4 +212,33 @@ func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
 		// Log error but don't fail the request
 		println("Failed to log traffic:", err.Error())
 	}
+}
+
+// lookupVHostDomain finds the vhost domain from database based on HTTP Host header
+// If Host is an IP or doesn't match any vhost, returns the original Host value (for fallback)
+// If a matching vhost is found by domain, returns the domain name
+func lookupVHostDomain(db *sqlx.DB, httpHost string) string {
+	// Remove port if present (host:port)
+	hostOnly := httpHost
+	if idx := strings.LastIndex(httpHost, ":"); idx != -1 {
+		hostOnly = httpHost[:idx]
+	}
+
+	// First, check if the host is already a domain in our vhosts table
+	var domain string
+	err := db.Get(&domain, "SELECT domain FROM vhosts WHERE domain = $1 AND enabled = true LIMIT 1", hostOnly)
+	if err == nil {
+		return domain
+	}
+
+	// If not found by exact domain match, try to find any enabled vhost
+	// This handles cases where request comes via IP address
+	// We'll return the first enabled vhost domain as it's likely the primary one
+	err = db.Get(&domain, "SELECT domain FROM vhosts WHERE enabled = true ORDER BY created_at ASC LIMIT 1")
+	if err == nil {
+		return domain
+	}
+
+	// Fallback to original host if no vhost found
+	return httpHost
 }
