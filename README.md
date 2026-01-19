@@ -133,8 +133,10 @@ This project is committed to maintaining high security and code quality standard
 ```
 docode-waf/
 ├── cmd/
-│   └── waf/
-│       └── main.go              # Application entry point
+│   ├── waf/
+│   │   └── main.go              # Application entry point
+│   └── reset-password/
+│       └── main.go              # Admin password reset CLI tool
 ├── internal/
 │   ├── api/                     # API handlers
 │   │   ├── auth.go             # Authentication endpoints
@@ -293,6 +295,41 @@ After first deployment with Docker Compose, you can login with:
 - **Role**: superadmin
 
 > ⚠️ **Security**: Change default credentials immediately after first login for production deployments!
+
+---
+
+## 🛠️ CLI Tools
+
+### Reset Admin Password
+
+If you forgot the admin password, use the CLI tool to reset it:
+
+**From Docker container:**
+```bash
+docker compose exec waf /app/reset-password
+```
+
+**Or build and run locally:**
+```bash
+go build -o reset-password ./cmd/reset-password
+./reset-password
+```
+
+**Usage:**
+1. Enter admin username or email
+2. Enter new password (hidden input)
+3. Confirm new password
+
+```
+=== WAF Admin Password Reset Tool ===
+
+Enter admin username or email: admin
+Found admin: admin@docode.local (ID: xxx-xxx)
+Enter new password: 
+Confirm new password: 
+
+✅ Password updated successfully!
+```
 
 ---
 
