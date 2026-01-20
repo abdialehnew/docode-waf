@@ -1608,84 +1608,205 @@ const VHosts = () => {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-gray-600">Name</label>
-                  <p className="mt-1 text-gray-900">{selectedVHost.name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-gray-600">Domain</label>
-                  <a
-                    href={`${selectedVHost.ssl_enabled ? 'https' : 'http'}://${selectedVHost.domain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                  >
-                    {selectedVHost.domain}
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-gray-600">Backend URL</label>
-                <p className="mt-1 font-mono text-sm bg-gray-100 px-3 py-2 rounded">{selectedVHost.backend_url}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-gray-600">SSL Status</label>
-                  <div className="mt-1">
-                    {selectedVHost.ssl_enabled ? (
-                      <span className="px-3 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
-                        Enabled
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded text-sm font-medium">
-                        Disabled
-                      </span>
-                    )}
+            <div className="space-y-6">
+              {/* Basic Info */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Globe className="w-4 h-4" /> Basic Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500">Name</label>
+                    <p className="text-gray-900 font-medium">{selectedVHost.name}</p>
                   </div>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-gray-600">Status</label>
-                  <div className="mt-1">
-                    <span className={`px-3 py-1 rounded text-sm font-medium ${selectedVHost.enabled
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                      }`}>
+                  <div>
+                    <label className="text-xs text-gray-500">Domain</label>
+                    <a
+                      href={`${selectedVHost.ssl_enabled ? 'https' : 'http'}://${selectedVHost.domain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
+                    >
+                      {selectedVHost.domain}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Status</label>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${selectedVHost.enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {selectedVHost.enabled ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">SSL</label>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${selectedVHost.ssl_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                      {selectedVHost.ssl_enabled ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {selectedVHost.ssl_certificate_id && (
-                <div>
-                  <label className="text-sm font-semibold text-gray-600">SSL Certificate ID</label>
-                  <p className="mt-1 font-mono text-xs text-gray-600">{selectedVHost.ssl_certificate_id}</p>
-                </div>
-              )}
-
-              {selectedVHost.created_at && (
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              {/* Backend Configuration */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Server className="w-4 h-4" /> Backend Configuration
+                </h3>
+                <div className="space-y-3">
                   <div>
-                    <label className="text-sm font-semibold text-gray-600">Created At</label>
-                    <p className="mt-1 text-sm text-gray-900">
-                      {new Date(selectedVHost.created_at).toLocaleString()}
-                    </p>
+                    <label className="text-xs text-gray-500">Primary Backend URL</label>
+                    <p className="font-mono text-sm bg-white px-3 py-2 rounded border">{selectedVHost.backend_url}</p>
                   </div>
-                  {selectedVHost.updated_at && (
+                  {selectedVHost.backends && selectedVHost.backends.length > 0 && (
                     <div>
-                      <label className="text-sm font-semibold text-gray-600">Updated At</label>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {new Date(selectedVHost.updated_at).toLocaleString()}
-                      </p>
+                      <label className="text-xs text-gray-500">Additional Backends ({selectedVHost.backends.length})</label>
+                      <div className="space-y-1 mt-1">
+                        {selectedVHost.backends.map((backend, idx) => (
+                          <p key={idx} className="font-mono text-sm bg-white px-3 py-1 rounded border">{backend}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedVHost.backends && selectedVHost.backends.length > 0 && (
+                    <div>
+                      <label className="text-xs text-gray-500">Load Balance Method</label>
+                      <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium ml-2">
+                        {selectedVHost.load_balance_method || 'round_robin'}
+                      </span>
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Protocol Settings */}
+              <div className="bg-purple-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Shield className="w-4 h-4" /> Protocol & Security
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500">HTTP Version</label>
+                    <p className="font-medium">{selectedVHost.http_version || '1.1'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">TLS Version</label>
+                    <p className="font-medium">{selectedVHost.tls_version || '1.2'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">WebSocket</label>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${selectedVHost.websocket_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                      {selectedVHost.websocket_enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Max Upload</label>
+                    <p className="font-medium">{selectedVHost.max_upload_size || 100} MB</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Read Timeout</label>
+                    <p className="font-medium">{selectedVHost.proxy_read_timeout || 60}s</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Connect Timeout</label>
+                    <p className="font-medium">{selectedVHost.proxy_connect_timeout || 60}s</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bot Detection & Rate Limiting */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    🤖 Bot Detection
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">Status</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${selectedVHost.bot_detection_enabled ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600'}`}>
+                        {selectedVHost.bot_detection_enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                    {selectedVHost.bot_detection_enabled && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Type</span>
+                        <span className="text-sm font-medium">{selectedVHost.bot_detection_type || 'turnstile'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    ⏱️ Rate Limiting
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">Status</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${selectedVHost.rate_limit_enabled ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'}`}>
+                        {selectedVHost.rate_limit_enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                    {selectedVHost.rate_limit_enabled && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-500">Requests</span>
+                          <span className="text-sm font-medium">{selectedVHost.rate_limit_requests || 100}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-500">Window</span>
+                          <span className="text-sm font-medium">{selectedVHost.rate_limit_window || 60}s</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Locations */}
+              {selectedVHost.custom_locations && selectedVHost.custom_locations.length > 0 && (
+                <div className="bg-indigo-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    📍 Custom Locations ({selectedVHost.custom_locations.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedVHost.custom_locations.map((loc, idx) => (
+                      <div key={idx} className="bg-white rounded p-3 border text-sm">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono font-medium text-indigo-600">{loc.path}</span>
+                          <span className="text-gray-400">→</span>
+                          <span className="font-mono text-gray-600">{loc.proxy_pass}</span>
+                        </div>
+                        {loc.websocket_enabled && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">WebSocket</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
+
+              {/* Custom Config */}
+              {selectedVHost.custom_config && (
+                <div className="bg-gray-100 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    📝 Custom Nginx Config
+                  </h3>
+                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto max-h-32">
+                    {selectedVHost.custom_config}
+                  </pre>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t text-sm">
+                <div>
+                  <label className="text-xs text-gray-500">Created At</label>
+                  <p className="text-gray-700">{selectedVHost.created_at ? new Date(selectedVHost.created_at).toLocaleString() : '-'}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Updated At</label>
+                  <p className="text-gray-700">{selectedVHost.updated_at ? new Date(selectedVHost.updated_at).toLocaleString() : '-'}</p>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3 justify-end mt-6 pt-4 border-t">
