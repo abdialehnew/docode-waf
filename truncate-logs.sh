@@ -34,7 +34,7 @@ echo ""
 echo -e "${BLUE}Truncating logs...${NC}"
 
 # Execute SQL commands via docker compose
-docker compose exec -T postgres psql -U waf_user -d waf_db << 'EOF'
+docker compose exec -T postgres psql -U waf_user -d docode_waf << 'EOF'
 -- Truncate traffic logs (includes attack logs)
 TRUNCATE TABLE traffic_logs;
 
