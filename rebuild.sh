@@ -44,7 +44,7 @@ echo ""
 
 # Step 5: Deploy containers
 echo -e "${YELLOW}[5/5] Deploying containers...${NC}"
-docker compose up -d waf frontend nginx-proxy
+docker compose up -d nginx-proxy waf frontend
 echo -e "${GREEN}✓ Containers deployed${NC}"
 echo ""
 
