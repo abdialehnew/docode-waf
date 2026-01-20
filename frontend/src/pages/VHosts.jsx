@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { getVHosts, createVHost, deleteVHost } from '../services/api'
-import { Plus, Trash2, Edit, Server, Search, Grid3x3, List, ChevronUp, ChevronDown, ChevronsUpDown, ChevronDown as ChevronDownIcon, CheckCircle, AlertCircle, Loader2, Shield, Eye, ExternalLink, ChevronLeft, ChevronRight, FileCode } from 'lucide-react'
+import { Plus, Trash2, Edit, Server, Search, Grid3x3, List, ChevronUp, ChevronDown, ChevronsUpDown, ChevronDown as ChevronDownIcon, CheckCircle, AlertCircle, Loader2, Shield, Eye, ExternalLink, ChevronLeft, ChevronRight, FileCode, Globe } from 'lucide-react'
 import logger from '../utils/logger'
 
 const VHosts = () => {
