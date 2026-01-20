@@ -41,11 +41,26 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 		log.Printf("[IP Blocker] Client IP: %s, Domain: %s, X-Forwarded-For: %s, X-Real-IP: %s, RemoteAddr: %s",
 			clientIP, domain, xForwardedFor, xRealIP, c.Request.RemoteAddr)
 
+		// Check if vhost has an active whitelist
+		hasWhitelist, err := vhostHasActiveWhitelist(db, domain)
+		if err != nil {
+			log.Printf("[IP Blocker] Error checking whitelist for domain %s: %v", domain, err)
+		}
+
 		// Check whitelist first (both global and vhost-specific)
 		whitelisted, err := isIPInGroup(db, clientIP, domain, "whitelist")
 		if err == nil && whitelisted {
 			log.Printf("[IP Blocker] IP %s is whitelisted for domain %s", clientIP, domain)
 			c.Next()
+			return
+		}
+
+		// If vhost has an active whitelist and IP is not in it, block the request
+		if hasWhitelist {
+			log.Printf("[IP Blocker] IP %s is NOT in whitelist for domain %s - blocking request (whitelist mode)", clientIP, domain)
+			c.Header("Content-Type", "text/html; charset=utf-8")
+			c.String(http.StatusForbidden, getWhitelistBlockedPageHTML(clientIP, domain))
+			c.Abort()
 			return
 		}
 
@@ -71,6 +86,127 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// vhostHasActiveWhitelist checks if a domain has any active whitelist groups
+func vhostHasActiveWhitelist(db *sqlx.DB, domain string) (bool, error) {
+	query := `
+		SELECT COUNT(*) > 0
+		FROM ip_groups ig
+		JOIN ip_group_vhosts igv ON ig.id = igv.ip_group_id
+		JOIN vhosts v ON igv.vhost_id = v.id
+		WHERE ig.type = 'whitelist' AND v.domain = $1
+	`
+	var hasWhitelist bool
+	err := db.Get(&hasWhitelist, query, domain)
+	if err != nil {
+		return false, err
+	}
+
+	// Also check global whitelists (no vhost associations)
+	if !hasWhitelist {
+		globalQuery := `
+			SELECT COUNT(*) > 0
+			FROM ip_groups ig
+			WHERE ig.type = 'whitelist' 
+			AND NOT EXISTS (SELECT 1 FROM ip_group_vhosts WHERE ip_group_id = ig.id)
+		`
+		err = db.Get(&hasWhitelist, globalQuery)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	return hasWhitelist, nil
+}
+
+// getWhitelistBlockedPageHTML returns a styled HTML page for whitelist-blocked users
+func getWhitelistBlockedPageHTML(clientIP, domain string) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Restricted - Not in Whitelist</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #4f46e5 0%%, #7c3aed 100%%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%%;
+            padding: 40px;
+            text-align: center;
+        }
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 25px;
+            background: linear-gradient(135deg, #6366f1 0%%, #8b5cf6 100%%);
+            border-radius: 50%%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon svg { width: 50px; height: 50px; fill: white; }
+        h1 { color: #1f2937; font-size: 28px; margin-bottom: 15px; }
+        .subtitle { color: #6b7280; font-size: 16px; margin-bottom: 25px; line-height: 1.6; }
+        .info-box {
+            background: #f3f4f6;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .info-label { color: #6b7280; font-size: 14px; }
+        .info-value { color: #1f2937; font-weight: 600; font-family: monospace; }
+        .message {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
+            margin-top: 20px;
+        }
+        .message p { color: #1e40af; line-height: 1.6; font-size: 14px; }
+        .footer { margin-top: 25px; color: #9ca3af; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">
+            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+        </div>
+        <h1>Access Restricted</h1>
+        <p class="subtitle">This resource requires IP whitelist authorization.<br>Your IP address is not in the allowed list.</p>
+        <div class="info-box">
+            <div class="info-row">
+                <span class="info-label">Your IP Address</span>
+                <span class="info-value">%s</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Requested Domain</span>
+                <span class="info-value">%s</span>
+            </div>
+        </div>
+        <div class="message">
+            <p>This domain uses <strong>IP Whitelist</strong> access control. Only pre-approved IP addresses can access this resource. Please contact your System Administrator to request access.</p>
+        </div>
+        <div class="footer">Protected by DoCode WAF</div>
+    </div>
+</body>
+</html>`, clientIP, domain)
 }
 
 func isIPInGroup(db *sqlx.DB, clientIP, domain, groupType string) (bool, error) {
