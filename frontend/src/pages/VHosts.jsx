@@ -22,6 +22,8 @@ const VHosts = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null)
   const [confirmMessage, setConfirmMessage] = useState('')
+  const [confirmButtonText, setConfirmButtonText] = useState('Confirm')
+  const [confirmButtonStyle, setConfirmButtonStyle] = useState('btn-danger')
   const [globalLoading, setGlobalLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -259,6 +261,8 @@ const VHosts = () => {
 
   const handleDelete = (id) => {
     setConfirmMessage('Are you sure you want to delete this virtual host?')
+    setConfirmButtonText('Delete')
+    setConfirmButtonStyle('btn-danger')
     setConfirmAction(() => async () => {
       setShowConfirmModal(false)
       setGlobalLoading(true)
@@ -277,6 +281,8 @@ const VHosts = () => {
 
   const handleRegenerateConfigs = () => {
     setConfirmMessage('This will regenerate nginx configuration files for all enabled virtual hosts using the optimized template. Do you want to continue?')
+    setConfirmButtonText('Regenerate')
+    setConfirmButtonStyle('btn-primary')
     setConfirmAction(() => async () => {
       setShowConfirmModal(false)
       setRegenerating(true)
@@ -1615,9 +1621,9 @@ const VHosts = () => {
                     await confirmAction()
                   }
                 }}
-                className="btn btn-danger"
+                className={`btn ${confirmButtonStyle}`}
               >
-                Delete
+                {confirmButtonText}
               </button>
             </div>
           </div>
