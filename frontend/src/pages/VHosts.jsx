@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api, { getVHosts, createVHost, deleteVHost } from '../services/api'
-import { Plus, Trash2, Edit, Server, Search, Grid3x3, List, ChevronUp, ChevronDown, ChevronsUpDown, ChevronDown as ChevronDownIcon, CheckCircle, AlertCircle, Loader2, Shield, Eye, ExternalLink, ChevronLeft, ChevronRight, FileCode, Globe } from 'lucide-react'
+import api, { getVHosts, createVHost, deleteVHost, regenerateAllConfigs } from '../services/api'
+import { Plus, Trash2, Edit, Server, Search, Grid3x3, List, ChevronUp, ChevronDown, ChevronsUpDown, ChevronDown as ChevronDownIcon, CheckCircle, AlertCircle, Loader2, Shield, Eye, ExternalLink, ChevronLeft, ChevronRight, FileCode, Globe, RefreshCw } from 'lucide-react'
 import logger from '../utils/logger'
 
 const VHosts = () => {
@@ -28,6 +28,7 @@ const VHosts = () => {
   const [selectedVHost, setSelectedVHost] = useState(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingVHostId, setEditingVHostId] = useState(null)
+  const [regenerating, setRegenerating] = useState(false)
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -274,6 +275,33 @@ const VHosts = () => {
     setShowConfirmModal(true)
   }
 
+  const handleRegenerateConfigs = () => {
+    setConfirmMessage('This will regenerate nginx configuration files for all enabled virtual hosts using the optimized template. Do you want to continue?')
+    setConfirmAction(() => async () => {
+      setShowConfirmModal(false)
+      setRegenerating(true)
+      setGlobalLoading(true)
+      setLoadingMessage('Regenerating nginx configs...')
+      try {
+        const response = await regenerateAllConfigs()
+        const { count, errors } = response.data
+        if (errors && errors.length > 0) {
+          logger.warn('Some configs had errors:', errors)
+          alert(`Regenerated ${count} configs with ${errors.length} errors. Check console for details.`)
+        } else {
+          alert(`Successfully regenerated ${count} nginx configuration files!`)
+        }
+      } catch (error) {
+        logger.error('Failed to regenerate configs:', error)
+        alert('Failed to regenerate configs: ' + (error.response?.data?.error || error.message))
+      } finally {
+        setRegenerating(false)
+        setGlobalLoading(false)
+      }
+    })
+    setShowConfirmModal(true)
+  }
+
   const handleSort = (field) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
@@ -436,6 +464,15 @@ const VHosts = () => {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Virtual Hosts</h1>
+        <button
+          onClick={handleRegenerateConfigs}
+          disabled={regenerating}
+          className="btn btn-secondary flex items-center gap-2"
+          title="Regenerate nginx configs for all vhosts using optimized template"
+        >
+          <RefreshCw className={`w-5 h-5 ${regenerating ? 'animate-spin' : ''}`} />
+          {regenerating ? 'Regenerating...' : 'Regenerate Configs'}
+        </button>
         <button
           onClick={() => {
             setIsEditMode(false)

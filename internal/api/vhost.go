@@ -802,3 +802,46 @@ func (h *VHostHandler) reloadNginx() {
 	}
 	fmt.Println("Nginx reload signal created, manual reload may be needed: docker compose exec nginx-proxy nginx -s reload")
 }
+
+// RegenerateAllConfigs regenerates nginx config files for all vhosts
+func (h *VHostHandler) RegenerateAllConfigs(c *gin.Context) {
+	// Get all enabled vhosts
+	vhosts, err := h.vhostService.ListVHosts()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch vhosts: " + err.Error()})
+		return
+	}
+
+	var regenerated []string
+	var errors []string
+
+	for _, vhost := range vhosts {
+		if !vhost.Enabled {
+			continue
+		}
+
+		// Generate nginx config
+		if err := h.nginxConfigService.GenerateVHostConfig(vhost); err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", vhost.Domain, err))
+			continue
+		}
+		regenerated = append(regenerated, vhost.Domain)
+	}
+
+	// Reload nginx
+	h.reloadNginx()
+
+	// Reload proxy map
+	if h.proxyReloader != nil {
+		if err := h.proxyReloader.ReloadVHosts(); err != nil {
+			fmt.Printf(proxyReloadWarningMsg, err)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Configs regenerated successfully",
+		"regenerated": regenerated,
+		"count":       len(regenerated),
+		"errors":      errors,
+	})
+}

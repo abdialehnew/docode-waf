@@ -185,6 +185,7 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		// VHost Config Editor
 		protected.GET("/vhost-config/:domain", vhostHandler.GetVHostConfig)
 		protected.PUT("/vhost-config/:domain", vhostHandler.UpdateVHostConfig)
+		protected.POST("/vhosts/regenerate-configs", vhostHandler.RegenerateAllConfigs)
 
 		// IP Groups
 		protected.GET("/ip-groups", ipGroupHandler.ListIPGroups)
