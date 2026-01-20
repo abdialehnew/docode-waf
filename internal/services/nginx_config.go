@@ -148,7 +148,7 @@ server {
     error_log /var/log/nginx/{{.Domain}}_error.log warn;
     
     # Per-VHost Upload Size Limit
-    client_max_body_size {{if .MaxUploadSize}}{{.MaxUploadSize}}{{else}}100{{end}}m;
+    client_max_body_size 100m;
     
     # Static Assets Caching (Performance Optimization)
     location ~* \.(jpg|jpeg|png|gif|ico|svg|webp|avif)$ {
@@ -264,9 +264,9 @@ server {
         proxy_busy_buffers_size 16k;
         
         # Per-VHost Timeouts
-        proxy_connect_timeout {{if .ProxyConnectTimeout}}{{.ProxyConnectTimeout}}{{else}}60{{end}}s;
-        proxy_send_timeout {{if .ProxyReadTimeout}}{{.ProxyReadTimeout}}{{else}}60{{end}}s;
-        proxy_read_timeout {{if .ProxyReadTimeout}}{{.ProxyReadTimeout}}{{else}}60{{end}}s;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
         
         # Proxy Cache Configuration
         proxy_cache backend_cache;
