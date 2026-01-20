@@ -95,6 +95,7 @@ services:
       - ./data/nginx/ssl:/etc/nginx/ssl/certificates:ro
       - ./data/nginx/config:/etc/nginx/conf.d
       - ./data/nginx/vhost:/etc/nginx/vhost.d
+      - ./data/nginx/cache:/var/cache/nginx  # Proxy cache directory
     depends_on:
       - waf
     networks:

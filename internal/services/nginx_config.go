@@ -75,7 +75,12 @@ upstream {{.UpstreamName}}_backend {
     {{if eq .LoadBalanceMethod "least_conn"}}least_conn;
     {{else if eq .LoadBalanceMethod "ip_hash"}}ip_hash;
     {{end}}{{range .Backends}}
-    server {{.}};{{end}}
+    server {{.}} weight=1 max_fails=3 fail_timeout=30s;{{end}}
+    
+    # Keepalive connections to backend
+    keepalive 32;
+    keepalive_requests 1000;
+    keepalive_timeout 60s;
 }
 {{end}}{{range .CustomLocations}}{{if .HasUpstream}}
 # Upstream for location: {{.Path}}
@@ -83,7 +88,11 @@ upstream {{.UpstreamName}}_backend {
     {{if eq .LoadBalanceMethod "least_conn"}}least_conn;
     {{else if eq .LoadBalanceMethod "ip_hash"}}ip_hash;
     {{end}}{{range .Backends}}
-    server {{.}};{{end}}
+    server {{.}} weight=1 max_fails=3 fail_timeout=30s;{{end}}
+    
+    keepalive 16;
+    keepalive_requests 500;
+    keepalive_timeout 60s;
 }
 {{end}}{{end}}
 server {
@@ -137,6 +146,38 @@ server {
     # Access and Error Logs
     access_log /var/log/nginx/{{.Domain}}_access.log;
     error_log /var/log/nginx/{{.Domain}}_error.log warn;
+    
+    # Per-VHost Upload Size Limit
+    client_max_body_size {{if .MaxUploadSize}}{{.MaxUploadSize}}{{else}}100{{end}}m;
+    
+    # Static Assets Caching (Performance Optimization)
+    location ~* \.(jpg|jpeg|png|gif|ico|svg|webp|avif)$ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform, immutable";
+        add_header Vary "Accept-Encoding";
+        access_log off;
+        log_not_found off;
+        
+        proxy_pass http://waf:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_cache backend_cache;
+        proxy_cache_valid 200 30d;
+        proxy_cache_valid 404 1m;
+    }
+    
+    location ~* \.(css|js|woff|woff2|ttf|eot)$ {
+        expires 7d;
+        add_header Cache-Control "public, no-transform";
+        add_header Vary "Accept-Encoding";
+        access_log off;
+        
+        proxy_pass http://waf:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_cache backend_cache;
+        proxy_cache_valid 200 7d;
+    }
     
     # Security: Deny access to hidden files (except .well-known and .vite for dev)
     location ~ /\.(?!well-known|vite) {
@@ -218,17 +259,22 @@ server {
         
         # Proxy Buffering for Performance
         proxy_buffering on;
-        proxy_buffer_size 4k;
-        proxy_buffers 8 4k;
-        proxy_busy_buffers_size 8k;
+        proxy_buffer_size 8k;
+        proxy_buffers 16 8k;
+        proxy_busy_buffers_size 16k;
         
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        # Per-VHost Timeouts
+        proxy_connect_timeout {{if .ProxyConnectTimeout}}{{.ProxyConnectTimeout}}{{else}}60{{end}}s;
+        proxy_send_timeout {{if .ProxyReadTimeout}}{{.ProxyReadTimeout}}{{else}}60{{end}}s;
+        proxy_read_timeout {{if .ProxyReadTimeout}}{{.ProxyReadTimeout}}{{else}}60{{end}}s;
         
-        # Cache for static files
-        proxy_cache_bypass $http_upgrade;
+        # Proxy Cache Configuration
+        proxy_cache backend_cache;
+        proxy_cache_valid 200 10m;
+        proxy_cache_valid 404 1m;
+        proxy_cache_bypass $http_upgrade $http_cache_control;
+        proxy_no_cache $http_pragma $http_authorization;
+        add_header X-Cache-Status $upstream_cache_status always;
         {{if .CustomConfig}}
         # Custom Configuration
         {{.CustomConfig}}{{end}}
