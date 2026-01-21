@@ -257,10 +257,10 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         
-        # Per-VHost Timeouts (longer for API/heavy responses)
-        proxy_connect_timeout 120s;
-        proxy_send_timeout 120s;
-        proxy_read_timeout 120s;
+        # Per-VHost Timeouts (5 minutes for slow APIs)
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
         
         # Proxy Cache Configuration
         proxy_cache backend_cache;
