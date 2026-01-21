@@ -38,7 +38,7 @@ echo ""
 
 # Step 4: Build new images
 echo -e "${YELLOW}[4/5] Building new images...${NC}"
-docker compose build nginx-proxy waf frontend
+docker compose build --no-cache waf nginx-proxy frontend
 echo -e "${GREEN}✓ Images built successfully${NC}"
 echo ""
 
