@@ -257,16 +257,10 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         
-        # Proxy Buffering for Performance
-        proxy_buffering on;
-        proxy_buffer_size 8k;
-        proxy_buffers 16 8k;
-        proxy_busy_buffers_size 16k;
-        
-        # Per-VHost Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        # Per-VHost Timeouts (longer for API/heavy responses)
+        proxy_connect_timeout 120s;
+        proxy_send_timeout 120s;
+        proxy_read_timeout 120s;
         
         # Proxy Cache Configuration
         proxy_cache backend_cache;
