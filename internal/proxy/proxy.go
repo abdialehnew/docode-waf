@@ -28,14 +28,17 @@ func NewReverseProxy(cfg *config.Config, vhostService *services.VHostService) *R
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
+			Timeout:   300 * time.Second, // 5 minutes to match nginx
+			KeepAlive: 300 * time.Second, // 5 minutes keepalive
 		}).DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		ForceAttemptHTTP2:     false, // Disable HTTP/2 to avoid connection issues
+		MaxIdleConns:          200,
+		MaxIdleConnsPerHost:   100,
+		IdleConnTimeout:       300 * time.Second, // 5 minutes
+		TLSHandshakeTimeout:   30 * time.Second,
+		ExpectContinueTimeout: 10 * time.Second,
+		ResponseHeaderTimeout: 300 * time.Second, // 5 minutes for slow APIs
+		DisableKeepAlives:     false,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: false,
 		},
