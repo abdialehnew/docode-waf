@@ -109,14 +109,18 @@ func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, 
 	geoIPService := services.NewGeoIPService()
 
 	// Apply WAF middleware
+	wafRouter.Use(middleware.SecurityHeadersMiddleware(db)) // Security headers first
 	wafRouter.Use(middleware.RateLimiterMiddleware(redisClient, db))
 	wafRouter.Use(middleware.HTTPFloodProtectionMiddleware(redisClient, cfg.WAF.HTTPFlood.MaxRequestsPerMinute, time.Minute))
 	wafRouter.Use(middleware.IPBlockerMiddleware(db))
 	wafRouter.Use(middleware.RegionFilter(db, geoIPService))
+	wafRouter.Use(middleware.OWASPProtectionMiddleware(db))         // OWASP Top 10 protection
+	wafRouter.Use(middleware.BruteForceMiddleware(redisClient, db)) // Brute force protection
 	wafRouter.Use(middleware.BotDetectorMiddleware(db))
 	wafRouter.Use(middleware.LoggingMiddleware(db))
 
 	// Proxy all requests to the reverse proxy
+
 	wafRouter.NoRoute(gin.WrapH(reverseProxyHandler))
 
 	// Create server
