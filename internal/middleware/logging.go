@@ -20,13 +20,22 @@ var (
 // initGeoIP initializes the GeoIP database
 func initGeoIP() {
 	geoipDBOnce.Do(func() {
-		db, err := geoip2.Open("GeoLite2-Country.mmdb")
-		if err != nil {
-			log.Printf("Warning: Failed to load GeoIP database: %v", err)
-			return
+		// Try multiple paths for GeoIP database
+		paths := []string{
+			"/GeoLite2-Country.mmdb",  // Docker container path
+			"GeoLite2-Country.mmdb",   // Local development path
+			"./GeoLite2-Country.mmdb", // Current directory
 		}
-		geoipDB = db
-		log.Println("GeoIP database loaded successfully")
+
+		for _, path := range paths {
+			db, err := geoip2.Open(path)
+			if err == nil {
+				geoipDB = db
+				log.Printf("GeoIP database loaded successfully from: %s", path)
+				return
+			}
+		}
+		log.Printf("Warning: Failed to load GeoIP database from any path")
 	})
 }
 
