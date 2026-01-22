@@ -76,7 +76,7 @@ func BruteForceMiddleware(redisClient *redis.Client, db *sqlx.DB) gin.HandlerFun
 			return
 		}
 
-		clientIP := c.ClientIP()
+		clientIP := GetRealClientIP(c)
 		ctx := context.Background()
 
 		// Keys for tracking

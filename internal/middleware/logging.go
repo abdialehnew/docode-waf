@@ -88,7 +88,7 @@ func LoggingMiddleware(db *sqlx.DB) gin.HandlerFunc {
 // Skips detection for private/local IPs to avoid false positives during testing
 func detectAttackType(c *gin.Context) (bool, string) {
 	// Skip attack detection for private/local IPs
-	clientIP := net.ParseIP(c.ClientIP())
+	clientIP := net.ParseIP(GetRealClientIP(c))
 	if clientIP != nil && (clientIP.IsPrivate() || clientIP.IsLoopback()) {
 		return false, ""
 	}
@@ -194,7 +194,8 @@ func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
 		}
 	}
 
-	countryCode := getCountryCode(c.ClientIP())
+	realClientIP := GetRealClientIP(c)
+	countryCode := getCountryCode(realClientIP)
 
 	// Get the HTTP Host header and try to find the matching vhost domain
 	httpHost := c.Request.Host
@@ -202,7 +203,7 @@ func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
 
 	_, err := db.Exec(query,
 		time.Now(),
-		c.ClientIP(),
+		realClientIP,
 		c.Request.Method,
 		c.Request.URL.String(), // Changed from Path to String to include query params
 		c.Writer.Status(),

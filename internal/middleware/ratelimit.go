@@ -42,7 +42,7 @@ func RateLimiterMiddleware(redisClient *redis.Client, db *sqlx.DB) gin.HandlerFu
 			return
 		}
 
-		clientIP := c.ClientIP()
+		clientIP := GetRealClientIP(c)
 		key := fmt.Sprintf("ratelimit:%s:%s", domain, clientIP)
 		ctx := context.Background()
 

@@ -486,6 +486,17 @@ func OWASPProtectionMiddleware(db *sqlx.DB) gin.HandlerFunc {
 			domain = domain[:colonIdx]
 		}
 
+		// Get real client IP (from proxy headers)
+		clientIP := GetRealClientIP(c)
+
+		// Check if IP is whitelisted - skip OWASP protection for whitelisted IPs
+		whitelisted, _ := isIPInGroup(db, clientIP, domain, "whitelist")
+		if whitelisted {
+			log.Printf("[OWASP] IP %s is whitelisted for domain %s - skipping OWASP protection", clientIP, domain)
+			c.Next()
+			return
+		}
+
 		// Check if OWASP protection is enabled for this vhost
 		var vhostSettings struct {
 			OWASPProtectionEnabled bool   `db:"owasp_protection_enabled"`
@@ -548,7 +559,7 @@ func OWASPProtectionMiddleware(db *sqlx.DB) gin.HandlerFunc {
 
 			// Log the attack
 			log.Printf("[OWASP] Attack detected: type=%s, severity=%s, domain=%s, ip=%s, url=%s, blocked=%v",
-				result.AttackType, result.Severity, domain, c.ClientIP(), url, shouldBlock)
+				result.AttackType, result.Severity, domain, clientIP, url, shouldBlock)
 
 			// Set attack info in context for logging middleware
 			c.Set("is_attack", true)
@@ -559,7 +570,7 @@ func OWASPProtectionMiddleware(db *sqlx.DB) gin.HandlerFunc {
 				c.Set("blocked", true)
 				c.Set("block_reason", "OWASP: "+result.AttackType)
 				c.Header("Content-Type", "text/html; charset=utf-8")
-				c.String(http.StatusForbidden, getOWASPBlockedPageHTML(c.ClientIP(), domain, result))
+				c.String(http.StatusForbidden, getOWASPBlockedPageHTML(clientIP, domain, result))
 				c.Abort()
 				return
 			}
