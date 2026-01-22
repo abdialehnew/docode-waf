@@ -64,3 +64,5 @@ data/
 # GeoIP database files
 GeoLite2-Country.mmdb.tar.gz
 *.sh
+!rebuild.sh
+!truncate-logs.sh

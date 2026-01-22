@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useState, useEffect } from 'react'
 import ConfirmModal from './ConfirmModal'
 import api from '../services/api'
+import logger from '../utils/logger'
 
 const Layout = ({ children }) => {
   const location = useLocation()
@@ -21,7 +22,7 @@ const Layout = ({ children }) => {
     if (location.pathname.startsWith('/monitoring')) {
       setExpandedMenus(prev => ({ ...prev, monitoring: true }))
     }
-  }, [])
+  }, [location.pathname])
 
   const loadAppSettings = async () => {
     try {
@@ -29,10 +30,10 @@ const Layout = ({ children }) => {
       if (response.data) {
         setAppSettings(response.data)
         // Update document title
-        document.title = response.data.app_name
+        document.title = response.data.app_name || 'Docode WAF'
       }
     } catch (error) {
-      console.error('Failed to load app settings:', error)
+      logger.error('Failed to load app settings:', error)
     }
   }
 
@@ -46,7 +47,7 @@ const Layout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Virtual Hosts', path: '/vhosts', icon: Server },
-    { name: 'IP Groups', path: '/ip-groups', icon: Users },
+    { name: 'IP Groups & Blacklists/Whitelists', path: '/ip-groups', icon: Users },
     { name: 'Traffic Logs', path: '/traffic', icon: Activity },
     { name: 'SSL Certificates', path: '/certificates', icon: Lock },
     { 

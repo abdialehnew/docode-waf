@@ -154,12 +154,9 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 	// Public Settings route (accessible without authentication)
 	apiV1.GET("/settings/app", settingsHandler.GetAppSettings)
 
-	// Public Turnstile site key
+	// Public Turnstile site key (checks database settings)
 	apiV1.GET("/turnstile/sitekey", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"site_key": cfg.Turnstile.SiteKey,
-			"enabled":  cfg.Turnstile.SiteKey != "" && cfg.Turnstile.SiteKey != "${TURNSTILE_SITE_KEY}",
-		})
+		settingsHandler.GetTurnstileConfig(c, cfg.Turnstile.SiteKey)
 	})
 
 	// Protected routes (require authentication)
@@ -188,6 +185,7 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		// VHost Config Editor
 		protected.GET("/vhost-config/:domain", vhostHandler.GetVHostConfig)
 		protected.PUT("/vhost-config/:domain", vhostHandler.UpdateVHostConfig)
+		protected.POST("/vhosts/regenerate-configs", vhostHandler.RegenerateAllConfigs)
 
 		// IP Groups
 		protected.GET("/ip-groups", ipGroupHandler.ListIPGroups)
@@ -247,7 +245,7 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 	vhostHandler := api.NewVHostHandler(db, nginxConfigService, vhostService, certService, reverseProxyHandler)
 	ipGroupHandler := api.NewIPGroupHandler(db)
 	dashboardHandler := api.NewDashboardHandler(db)
-	authHandler := api.NewAuthHandler(authService, emailService, cfg)
+	authHandler := api.NewAuthHandler(authService, emailService, cfg, db)
 	certHandler := api.NewCertificateHandler(certService)
 	settingsHandler := api.NewSettingsHandler(db)
 	blockingHandler := api.NewBlockingRuleHandler(db)

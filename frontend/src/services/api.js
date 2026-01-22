@@ -51,6 +51,7 @@ export const getVHost = (id) => api.get(`/vhosts/${id}`)
 export const createVHost = (data) => api.post('/vhosts', data)
 export const updateVHost = (id, data) => api.put(`/vhosts/${id}`, data)
 export const deleteVHost = (id) => api.delete(`/vhosts/${id}`)
+export const regenerateAllConfigs = () => api.post('/vhosts/regenerate-configs')
 
 // IP Group APIs
 export const getIPGroups = () => api.get('/ip-groups')

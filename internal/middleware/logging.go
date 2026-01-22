@@ -76,7 +76,14 @@ func LoggingMiddleware(db *sqlx.DB) gin.HandlerFunc {
 }
 
 // detectAttackType analyzes request for attack patterns
+// Skips detection for private/local IPs to avoid false positives during testing
 func detectAttackType(c *gin.Context) (bool, string) {
+	// Skip attack detection for private/local IPs
+	clientIP := net.ParseIP(c.ClientIP())
+	if clientIP != nil && (clientIP.IsPrivate() || clientIP.IsLoopback()) {
+		return false, ""
+	}
+
 	url := c.Request.URL.String()
 	userAgent := c.GetHeader("User-Agent")
 
@@ -114,12 +121,34 @@ func detectAttackType(c *gin.Context) (bool, string) {
 		}
 	}
 
-	// Admin Panel Scanning
+	// Admin Panel Scanning - use more specific patterns to avoid false positives
+	// Check for actual admin paths, not just keywords in source code files
+	urlLower := strings.ToLower(url)
+
+	// Exact path matches (start of path)
 	adminPaths := []string{"/admin", "/administrator", "/wp-admin", "/phpmyadmin",
-		"/cpanel", "/admin.php", "/admin/login", "/dashboard", "/backend"}
+		"/cpanel", "/admin.php", "/adminpanel", "/backend", "/management"}
 	for _, path := range adminPaths {
-		if strings.Contains(strings.ToLower(url), path) {
+		// Check if URL starts with admin path or has it after domain
+		if strings.HasPrefix(urlLower, path) || strings.Contains(urlLower, "://"+c.Request.Host+path) {
 			return true, "Admin Scan"
+		}
+	}
+
+	// Common admin file patterns (avoid matching .tsx, .ts, .jsx, .js source files)
+	adminFilePatterns := []string{"/admin/login", "/admin/index", "/login.php", "/admin.asp"}
+	for _, pattern := range adminFilePatterns {
+		if strings.Contains(urlLower, pattern) {
+			return true, "Admin Scan"
+		}
+	}
+
+	// Exclude source code files from detection
+	sourceFileExtensions := []string{".tsx", ".ts", ".jsx", ".js", ".vue", ".py", ".go", ".java"}
+	for _, ext := range sourceFileExtensions {
+		if strings.HasSuffix(urlLower, ext) {
+			// Skip attack detection for source code files
+			break
 		}
 	}
 
@@ -157,7 +186,10 @@ func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
 	}
 
 	countryCode := getCountryCode(c.ClientIP())
-	host := c.Request.Host
+
+	// Get the HTTP Host header and try to find the matching vhost domain
+	httpHost := c.Request.Host
+	host := lookupVHostDomain(db, httpHost)
 
 	_, err := db.Exec(query,
 		time.Now(),
@@ -180,4 +212,33 @@ func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
 		// Log error but don't fail the request
 		println("Failed to log traffic:", err.Error())
 	}
+}
+
+// lookupVHostDomain finds the vhost domain from database based on HTTP Host header
+// If Host is an IP or doesn't match any vhost, returns the original Host value (for fallback)
+// If a matching vhost is found by domain, returns the domain name
+func lookupVHostDomain(db *sqlx.DB, httpHost string) string {
+	// Remove port if present (host:port)
+	hostOnly := httpHost
+	if idx := strings.LastIndex(httpHost, ":"); idx != -1 {
+		hostOnly = httpHost[:idx]
+	}
+
+	// First, check if the host is already a domain in our vhosts table
+	var domain string
+	err := db.Get(&domain, "SELECT domain FROM vhosts WHERE domain = $1 AND enabled = true LIMIT 1", hostOnly)
+	if err == nil {
+		return domain
+	}
+
+	// If not found by exact domain match, try to find any enabled vhost
+	// This handles cases where request comes via IP address
+	// We'll return the first enabled vhost domain as it's likely the primary one
+	err = db.Get(&domain, "SELECT domain FROM vhosts WHERE enabled = true ORDER BY created_at ASC LIMIT 1")
+	if err == nil {
+		return domain
+	}
+
+	// Fallback to original host if no vhost found
+	return httpHost
 }

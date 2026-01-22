@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getTrafficLogs } from '../services/api'
 import { format } from 'date-fns'
 import { RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from 'lucide-react'
+import logger from '../utils/logger'
 
 const TrafficLogs = () => {
   const [logs, setLogs] = useState([])
@@ -31,7 +32,7 @@ const TrafficLogs = () => {
       setLogs(logsData)
       setTotalLogs(logsData.length)
     } catch (error) {
-      console.error('Failed to load traffic logs:', error)
+      logger.error('Failed to load traffic logs:', error)
       setLogs([])
       setTotalLogs(0)
     } finally {
@@ -134,8 +135,9 @@ const TrafficLogs = () => {
         {/* Search and Controls */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b">
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Show</label>
+            <label htmlFor="rows-per-page" className="text-sm text-gray-600">Show</label>
             <select
+              id="rows-per-page"
               value={rowsPerPage}
               onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
               className="input py-1 px-2 text-sm"
@@ -145,7 +147,7 @@ const TrafficLogs = () => {
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
-            <label className="text-sm text-gray-600">entries</label>
+            <span className="text-sm text-gray-600">entries</span>
           </div>
 
           <div className="relative w-full sm:w-64">
@@ -166,9 +168,8 @@ const TrafficLogs = () => {
           <div className="text-center py-12 text-gray-500">
             <p className="text-lg mb-2">No traffic logs found</p>
             <p className="text-sm">
-              {searchTerm 
-                ? 'Try adjusting your search terms' 
-                : 'Traffic logs will appear here once requests are made to your virtual hosts'}
+              {searchTerm && 'Try adjusting your search terms'}
+              {!searchTerm && 'Traffic logs will appear here once requests are made to your virtual hosts'}
             </p>
           </div>
         ) : (
@@ -302,7 +303,7 @@ const TrafficLogs = () => {
                 </button>
                 
                 <div className="flex items-center gap-1">
-                  {[...new Array(Math.min(5, totalPages))].map((_, idx) => {
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
                     let pageNum
                     if (totalPages <= 5) {
                       pageNum = idx + 1

@@ -24,7 +24,10 @@ services:
       - ./migrations/006_add_recaptcha_version.sql:/docker-entrypoint-initdb.d/006_add_recaptcha_version.sql
       - ./migrations/006_add_smtp_and_signup_settings.sql:/docker-entrypoint-initdb.d/006_add_smtp_and_signup_settings.sql
       - ./migrations/007_add_region_filtering.sql:/docker-entrypoint-initdb.d/007_add_region_filtering.sql
+      - ./migrations/007_add_websocket_to_vhost_locations.sql:/docker-entrypoint-initdb.d/007_add_websocket_to_vhost_locations.sql
       - ./migrations/008_ip_groups_multiple_vhosts.sql:/docker-entrypoint-initdb.d/008_ip_groups_multiple_vhosts.sql
+      - ./migrations/008_add_turnstile_settings.sql:/docker-entrypoint-initdb.d/008_add_turnstile_settings.sql
+      - ./migrations/009_add_multiple_backends.sql:/docker-entrypoint-initdb.d/009_add_multiple_backends.sql
     networks:
       - waf-network
 
@@ -92,6 +95,7 @@ services:
       - ./data/nginx/ssl:/etc/nginx/ssl/certificates:ro
       - ./data/nginx/config:/etc/nginx/conf.d
       - ./data/nginx/vhost:/etc/nginx/vhost.d
+      - ./data/nginx/cache:/var/cache/nginx  # Proxy cache directory
     depends_on:
       - waf
     networks:

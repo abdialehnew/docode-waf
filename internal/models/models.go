@@ -26,6 +26,9 @@ type VHost struct {
 	Name                   string    `json:"name" db:"name"`
 	Domain                 string    `json:"domain" db:"domain"`
 	BackendURL             string    `json:"backend_url" db:"backend_url"`
+	Backends               []string  `json:"backends" db:"-"` // Multiple backend URLs for load balancing
+	LoadBalanceMethod      string    `json:"load_balance_method" db:"load_balance_method"`
+	CustomConfig           string    `json:"custom_config" db:"custom_config"`
 	SSLEnabled             bool      `json:"ssl_enabled" db:"ssl_enabled"`
 	SSLCertificateID       string    `json:"ssl_certificate_id,omitempty" db:"ssl_certificate_id"`
 	SSLCertPath            string    `json:"ssl_cert_path,omitempty" db:"ssl_cert_path"`

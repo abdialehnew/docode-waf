@@ -9,6 +9,7 @@ import (
 	"github.com/aleh/docode-waf/internal/config"
 	"github.com/aleh/docode-waf/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
 
 // AuthHandler handles authentication requests
@@ -16,15 +17,57 @@ type AuthHandler struct {
 	authService  *services.AuthService
 	emailService *services.EmailService
 	cfg          *config.Config
+	db           *sqlx.DB
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(authService *services.AuthService, emailService *services.EmailService, cfg *config.Config) *AuthHandler {
+func NewAuthHandler(authService *services.AuthService, emailService *services.EmailService, cfg *config.Config, db *sqlx.DB) *AuthHandler {
 	return &AuthHandler{
 		authService:  authService,
 		emailService: emailService,
 		cfg:          cfg,
+		db:           db,
 	}
+}
+
+// isTurnstileEnabledForLogin checks if Turnstile is enabled for login from database
+func (h *AuthHandler) isTurnstileEnabledForLogin() bool {
+	var settings struct {
+		TurnstileEnabled      bool `db:"turnstile_enabled"`
+		TurnstileLoginEnabled bool `db:"turnstile_login_enabled"`
+	}
+	query := `
+		SELECT 
+			COALESCE(turnstile_enabled, false) as turnstile_enabled,
+			COALESCE(turnstile_login_enabled, false) as turnstile_login_enabled
+		FROM app_settings 
+		WHERE id = 1
+	`
+	err := h.db.Get(&settings, query)
+	if err != nil {
+		return false // Default to disabled if error
+	}
+	return settings.TurnstileEnabled && settings.TurnstileLoginEnabled
+}
+
+// isTurnstileEnabledForRegister checks if Turnstile is enabled for register from database
+func (h *AuthHandler) isTurnstileEnabledForRegister() bool {
+	var settings struct {
+		TurnstileEnabled         bool `db:"turnstile_enabled"`
+		TurnstileRegisterEnabled bool `db:"turnstile_register_enabled"`
+	}
+	query := `
+		SELECT 
+			COALESCE(turnstile_enabled, false) as turnstile_enabled,
+			COALESCE(turnstile_register_enabled, false) as turnstile_register_enabled
+		FROM app_settings 
+		WHERE id = 1
+	`
+	err := h.db.Get(&settings, query)
+	if err != nil {
+		return false // Default to disabled if error
+	}
+	return settings.TurnstileEnabled && settings.TurnstileRegisterEnabled
 }
 
 // Register creates a new super admin account
@@ -42,8 +85,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Verify Turnstile token if configured
-	if h.cfg.Turnstile.SecretKey != "" && h.cfg.Turnstile.SecretKey != "${TURNSTILE_SECRET_KEY}" {
+	// Verify Turnstile token if configured AND enabled in database
+	if h.cfg.Turnstile.SecretKey != "" && h.cfg.Turnstile.SecretKey != "${TURNSTILE_SECRET_KEY}" && h.isTurnstileEnabledForRegister() {
 		if !h.verifyTurnstile(input.TurnstileToken, c.ClientIP()) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid captcha verification"})
 			return
@@ -79,8 +122,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Verify Turnstile token if configured
-	if h.cfg.Turnstile.SecretKey != "" && h.cfg.Turnstile.SecretKey != "${TURNSTILE_SECRET_KEY}" {
+	// Verify Turnstile token if configured AND enabled in database
+	if h.cfg.Turnstile.SecretKey != "" && h.cfg.Turnstile.SecretKey != "${TURNSTILE_SECRET_KEY}" && h.isTurnstileEnabledForLogin() {
 		if !h.verifyTurnstile(input.TurnstileToken, c.ClientIP()) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid captcha verification"})
 			return

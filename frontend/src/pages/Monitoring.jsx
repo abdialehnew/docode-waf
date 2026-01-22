@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import api from '../services/api';
+import logger from '../utils/logger';
 
 const Monitoring = () => {
   const [activeTab, setActiveTab] = useState('nginx');
@@ -23,14 +24,14 @@ const Monitoring = () => {
 
   useEffect(() => {
     fetchVhosts();
-    
+
     // Close dropdown when clicking outside
     const handleClickOutside = (event) => {
       if (showVhostDropdown && !event.target.closest('.relative')) {
         setShowVhostDropdown(false);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showVhostDropdown]);
@@ -85,14 +86,14 @@ const Monitoring = () => {
       setVhosts(data);
       // Don't auto-select first vhost, let user choose
     } catch (error) {
-      console.error('Failed to fetch vhosts:', error);
+      logger.error('Failed to fetch vhosts:', error);
       setVhosts([]);
     }
   };
 
   const fetchNginxLogs = async () => {
     if (!selectedVhost) return;
-    
+
     setLoading(true);
     try {
       const endpoint = logType === 'access' ? '/logs/nginx/access' : '/logs/nginx/error';
@@ -101,7 +102,7 @@ const Monitoring = () => {
       });
       setNginxLogs(response.data?.lines || []);
     } catch (error) {
-      console.error('Failed to fetch nginx logs:', error);
+      logger.error('Failed to fetch nginx logs:', error);
       setNginxLogs([]);
     } finally {
       setLoading(false);
@@ -120,7 +121,7 @@ const Monitoring = () => {
       });
       setWafLogs(response.data?.logs || []);
     } catch (error) {
-      console.error('Failed to fetch WAF logs:', error);
+      logger.error('Failed to fetch WAF logs:', error);
       setWafLogs([]);
     } finally {
       setLoading(false);
@@ -198,8 +199,8 @@ const Monitoring = () => {
                         {showVhostDropdown && (
                           <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                             {vhosts
-                              .filter(vhost => 
-                                !vhostSearch || 
+                              .filter(vhost =>
+                                !vhostSearch ||
                                 vhost.name.toLowerCase().includes(vhostSearch.toLowerCase()) ||
                                 vhost.domain.toLowerCase().includes(vhostSearch.toLowerCase())
                               )
@@ -211,9 +212,8 @@ const Monitoring = () => {
                                     setVhostSearch('');
                                     setShowVhostDropdown(false);
                                   }}
-                                  className={`px-3 py-2 cursor-pointer hover:bg-gray-100 ${
-                                    selectedVhost === vhost.domain ? 'bg-blue-50' : ''
-                                  }`}
+                                  className={`px-3 py-2 cursor-pointer hover:bg-gray-100 ${selectedVhost === vhost.domain ? 'bg-blue-50' : ''
+                                    }`}
                                 >
                                   <div className="font-medium">{vhost.name}</div>
                                   <div className="text-sm text-gray-500">{vhost.domain}</div>
@@ -245,31 +245,28 @@ const Monitoring = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setTimeRange('1D')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        timeRange === '1D'
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${timeRange === '1D'
                           ? 'bg-blue-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       1 Day
                     </button>
                     <button
                       onClick={() => setTimeRange('7D')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        timeRange === '7D'
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${timeRange === '7D'
                           ? 'bg-blue-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       7 Days
                     </button>
                     <button
                       onClick={() => setTimeRange('custom')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        timeRange === 'custom'
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${timeRange === 'custom'
                           ? 'bg-blue-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       Date Range
                     </button>
@@ -342,31 +339,28 @@ const Monitoring = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setWafTimeRange('1D')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        wafTimeRange === '1D'
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${wafTimeRange === '1D'
                           ? 'bg-blue-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       1 Day
                     </button>
                     <button
                       onClick={() => setWafTimeRange('7D')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        wafTimeRange === '7D'
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${wafTimeRange === '7D'
                           ? 'bg-blue-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       7 Days
                     </button>
                     <button
                       onClick={() => setWafTimeRange('custom')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        wafTimeRange === 'custom'
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${wafTimeRange === 'custom'
                           ? 'bg-blue-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       Date Range
                     </button>
@@ -404,6 +398,7 @@ const Monitoring = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left">Timestamp</th>
+                      <th className="px-4 py-3 text-left">VHost</th>
                       <th className="px-4 py-3 text-left">Client IP</th>
                       <th className="px-4 py-3 text-left">Method</th>
                       <th className="px-4 py-3 text-left">URL</th>
@@ -415,13 +410,13 @@ const Monitoring = () => {
                   <tbody className="divide-y">
                     {loading ? (
                       <tr>
-                        <td colSpan="7" className="px-4 py-8 text-center text-gray-400">
+                        <td colSpan="8" className="px-4 py-8 text-center text-gray-400">
                           Loading logs...
                         </td>
                       </tr>
                     ) : wafLogs.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="px-4 py-8 text-center text-gray-400">
+                        <td colSpan="8" className="px-4 py-8 text-center text-gray-400">
                           No logs found
                         </td>
                       </tr>
@@ -430,6 +425,11 @@ const Monitoring = () => {
                         <tr key={log.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 whitespace-nowrap">
                             {formatTimestamp(log.timestamp)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                              {log.host || '-'}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             {log.client_ip}
@@ -444,12 +444,11 @@ const Monitoring = () => {
                             {log.url}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              log.status_code >= 500 ? 'bg-red-100 text-red-800' :
-                              log.status_code >= 400 ? 'bg-yellow-100 text-yellow-800' :
-                              log.status_code >= 300 ? 'bg-blue-100 text-blue-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
+                            <span className={`px-2 py-1 rounded text-xs ${log.status_code >= 500 ? 'bg-red-100 text-red-800' :
+                                log.status_code >= 400 ? 'bg-yellow-100 text-yellow-800' :
+                                  log.status_code >= 300 ? 'bg-blue-100 text-blue-800' :
+                                    'bg-green-100 text-green-800'
+                              }`}>
                               {log.status_code}
                             </span>
                           </td>
