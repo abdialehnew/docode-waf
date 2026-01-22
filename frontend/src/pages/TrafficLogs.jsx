@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import PropTypes from 'prop-types'
 import { getTrafficLogs, getTrafficCountries, getTrafficIPs } from '../services/api'
 import { format } from 'date-fns'
 import { RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, X, ChevronDown } from 'lucide-react'
@@ -6,11 +7,11 @@ import logger from '../utils/logger'
 
 // Country code to flag emoji helper
 const getCountryFlag = (countryCode) => {
-  if (!countryCode || countryCode.length !== 2) return '🌐'
+  if (!countryCode?.length || countryCode.length !== 2) return '🌐'
   const codePoints = countryCode
     .toUpperCase()
     .split('')
-    .map(char => 127397 + char.charCodeAt(0))
+    .map(char => 127397 + (char.codePointAt(0) || 0))
   return String.fromCodePoint(...codePoints)
 }
 
@@ -52,11 +53,32 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, disable
     onChange(selected.filter(v => v !== value))
   }
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      if (!disabled) setIsOpen(!isOpen)
+    } else if (e.key === 'Escape') {
+      setIsOpen(false)
+    }
+  }
+
+  const handleOptionKeyDown = (e, value) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      toggleOption(value)
+    }
+  }
+
   return (
     <div className="relative">
-      <div 
-        className={`input min-h-[42px] flex flex-wrap gap-1 items-center cursor-pointer ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+      <button 
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        disabled={disabled}
+        className={`input min-h-[42px] w-full flex flex-wrap gap-1 items-center cursor-pointer text-left ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
+        onKeyDown={handleKeyDown}
       >
         {selected.length > 0 ? (
           <>
@@ -65,7 +87,14 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, disable
               return (
                 <span key={val} className="bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded flex items-center gap-1">
                   {opt?.flag} {opt?.label || val}
-                  <X className="w-3 h-3 cursor-pointer hover:text-red-600" onClick={(e) => removeSelected(val, e)} />
+                  <button 
+                    type="button"
+                    className="cursor-pointer hover:text-red-600 p-0 bg-transparent border-0"
+                    onClick={(e) => removeSelected(val, e)}
+                    aria-label={`Remove ${opt?.label || val}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </span>
               )
             })}
@@ -77,7 +106,7 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, disable
           <span className="text-gray-400">{placeholder}</span>
         )}
         <ChevronDown className={`w-4 h-4 ml-auto text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </div>
+      </button>
       
       {isOpen && !disabled && (
         <div className="absolute z-50 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-64 overflow-hidden">
@@ -98,8 +127,11 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, disable
               filteredOptions.map(opt => (
                 <div
                   key={opt.value}
+                  role="menuitem"
+                  tabIndex={0}
                   className={`px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-100 ${selected.includes(opt.value) ? 'bg-primary-50' : ''}`}
                   onClick={() => toggleOption(opt.value)}
+                  onKeyDown={(e) => handleOptionKeyDown(e, opt.value)}
                 >
                   <input
                     type="checkbox"
@@ -130,6 +162,24 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, disable
   )
 }
 
+MultiSelectDropdown.propTypes = {
+  options: PropTypes.arrayOf(PropTypes.shape({
+    value: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    flag: PropTypes.string,
+    count: PropTypes.number
+  })).isRequired,
+  selected: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onChange: PropTypes.func.isRequired,
+  placeholder: PropTypes.string,
+  disabled: PropTypes.bool
+}
+
+MultiSelectDropdown.defaultProps = {
+  placeholder: 'Select...',
+  disabled: false
+}
+
 const TrafficLogs = () => {
   const [logs, setLogs] = useState([])
   const [filteredLogs, setFilteredLogs] = useState([])
@@ -144,7 +194,7 @@ const TrafficLogs = () => {
   // Filter states
   const [countries, setCountries] = useState([])
   const [selectedCountries, setSelectedCountries] = useState([])
-  const [ips, setIPs] = useState([])
+  const [ipList, setIPList] = useState([])
   const [selectedIPs, setSelectedIPs] = useState([])
 
   useEffect(() => {
@@ -156,7 +206,7 @@ const TrafficLogs = () => {
     if (selectedCountries.length > 0) {
       loadIPs()
     } else {
-      setIPs([])
+      setIPList([])
       setSelectedIPs([])
     }
   }, [selectedCountries])
@@ -193,7 +243,7 @@ const TrafficLogs = () => {
   const loadIPs = async () => {
     try {
       const response = await getTrafficIPs(selectedCountries)
-      setIPs(response.data?.data || [])
+      setIPList(response.data?.data || [])
     } catch (error) {
       logger.error('Failed to load IPs:', error)
     }
@@ -295,13 +345,13 @@ const TrafficLogs = () => {
 
   // Prepare IP options for dropdown
   const ipOptions = useMemo(() => 
-    ips.map(ip => ({
+    ipList.map(ip => ({
       value: ip.client_ip,
       label: ip.client_ip,
       flag: getCountryFlag(ip.country_code),
       count: ip.count
     }))
-  , [ips])
+  , [ipList])
 
   // Pagination calculations
   const totalPages = Math.ceil(totalLogs / rowsPerPage)
@@ -343,7 +393,7 @@ const TrafficLogs = () => {
         {/* Filters Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pb-4 border-b">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+            <span className="block text-sm font-medium text-gray-700 mb-1" id="country-filter-label">Country</span>
             <MultiSelectDropdown
               options={countryOptions}
               selected={selectedCountries}
@@ -352,7 +402,7 @@ const TrafficLogs = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">IP Source</label>
+            <span className="block text-sm font-medium text-gray-700 mb-1" id="ip-filter-label">IP Source</span>
             <MultiSelectDropdown
               options={ipOptions}
               selected={selectedIPs}
