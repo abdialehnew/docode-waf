@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings as SettingsIcon, Upload, X, Mail, Eye, EyeOff } from 'lucide-react'
+import { Upload, X, Mail, Eye, EyeOff } from 'lucide-react'
 import api from '../services/api'
 import logger from '../utils/logger'
 
@@ -77,7 +77,7 @@ const Settings = () => {
       await api.post('/settings/app', appSettings)
       alert('Application settings saved successfully!')
       // Reload page to update logo in sidebar
-      window.location.reload()
+      globalThis.location.reload()
     } catch (error) {
       logger.error('Failed to save app settings:', error)
       alert('Failed to save settings: ' + (error.response?.data?.error || error.message))
@@ -98,7 +98,7 @@ const Settings = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label className="label">Application Name</label>
+                <span className="label">Application Name</span>
                 <input
                   type="text"
                   className="input"
@@ -112,7 +112,7 @@ const Settings = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="label">Application Logo</label>
+                <span className="label">Application Logo</span>
                 <div className="space-y-3">
                   {logoPreview ? (
                     <div className="relative inline-block">
@@ -158,14 +158,6 @@ const Settings = () => {
               </div>
             </div>
           </div>
-
-          <button
-            onClick={handleSaveAppSettings}
-            disabled={loading}
-            className="btn btn-primary w-full mt-6 disabled:opacity-50"
-          >
-            {loading ? 'Saving...' : 'Save Application Settings'}
-          </button>
         </div>
 
         {/* Authentication Settings */}
@@ -174,7 +166,7 @@ const Settings = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="label">User Registration</label>
+              <span className="label">User Registration</span>
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -204,7 +196,7 @@ const Settings = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="label">Global Turnstile</label>
+              <span className="label">Global Turnstile</span>
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -221,7 +213,7 @@ const Settings = () => {
               </p>
             </div>
 
-            <div className={`pl-6 space-y-3 ${!appSettings.turnstile_enabled ? 'opacity-50' : ''}`}>
+            <div className={`pl-6 space-y-3 ${appSettings.turnstile_enabled ? '' : 'opacity-50'}`}>
               <div>
                 <div className="flex items-center gap-2">
                   <input
@@ -279,7 +271,7 @@ const Settings = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="label">SMTP Host *</label>
+              <span className="label">SMTP Host *</span>
               <input
                 type="text"
                 className="input"
@@ -290,18 +282,18 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">SMTP Port *</label>
+              <span className="label">SMTP Port *</span>
               <input
                 type="number"
                 className="input"
                 placeholder="587"
                 value={appSettings.smtp_port || 587}
-                onChange={(e) => setAppSettings({ ...appSettings, smtp_port: parseInt(e.target.value) })}
+                onChange={(e) => setAppSettings({ ...appSettings, smtp_port: Number.parseInt(e.target.value) })}
               />
             </div>
 
             <div>
-              <label className="label">SMTP Username</label>
+              <span className="label">SMTP Username</span>
               <input
                 type="text"
                 className="input"
@@ -312,7 +304,7 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">SMTP Password</label>
+              <span className="label">SMTP Password</span>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -332,7 +324,7 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">From Email *</label>
+              <span className="label">From Email *</span>
               <input
                 type="email"
                 className="input"
@@ -344,7 +336,7 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">From Name</label>
+              <span className="label">From Name</span>
               <input
                 type="text"
                 className="input"
@@ -387,7 +379,7 @@ const Settings = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="label">Rate Limiting</label>
+              <span className="label">Rate Limiting</span>
               <div className="flex items-center gap-2 mb-2">
                 <input type="checkbox" id="rate-limit" defaultChecked />
                 <label htmlFor="rate-limit" className="text-sm">Enable Rate Limiting</label>
@@ -401,7 +393,7 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">HTTP Flood Protection</label>
+              <span className="label">HTTP Flood Protection</span>
               <div className="flex items-center gap-2 mb-2">
                 <input type="checkbox" id="http-flood" defaultChecked />
                 <label htmlFor="http-flood" className="text-sm">Enable HTTP Flood Protection</label>
@@ -415,17 +407,13 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">Anti-Bot Protection</label>
+              <span className="label">Anti-Bot Protection</span>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="anti-bot" defaultChecked />
                 <label htmlFor="anti-bot" className="text-sm">Enable Anti-Bot Protection</label>
               </div>
             </div>
           </div>
-
-          <button className="btn btn-primary w-full mt-6">
-            Save Configuration
-          </button>
         </div>
 
         <div className="card">
@@ -433,7 +421,7 @@ const Settings = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="label">Auto SSL</label>
+              <span className="label">Auto SSL</span>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="auto-ssl" />
                 <label htmlFor="auto-ssl" className="text-sm">Enable automatic SSL certificate management</label>
@@ -441,7 +429,7 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">Certificate Directory</label>
+              <span className="label">Certificate Directory</span>
               <input
                 type="text"
                 className="input"
@@ -450,10 +438,6 @@ const Settings = () => {
               />
             </div>
           </div>
-
-          <button className="btn btn-primary w-full mt-6">
-            Save SSL Settings
-          </button>
         </div>
 
         <div className="card">
@@ -461,7 +445,7 @@ const Settings = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="label">Host</label>
+              <span className="label">Host</span>
               <input
                 type="text"
                 className="input"
@@ -470,7 +454,7 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">Port</label>
+              <span className="label">Port</span>
               <input
                 type="number"
                 className="input"
@@ -479,7 +463,7 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">Database Name</label>
+              <span className="label">Database Name</span>
               <input
                 type="text"
                 className="input"
@@ -487,10 +471,6 @@ const Settings = () => {
               />
             </div>
           </div>
-
-          <button className="btn btn-primary w-full mt-6">
-            Save Database Settings
-          </button>
         </div>
 
         <div className="card">
@@ -498,7 +478,7 @@ const Settings = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="label">Log Level</label>
+              <span className="label">Log Level</span>
               <select className="input">
                 <option value="debug">Debug</option>
                 <option value="info" selected>Info</option>
@@ -508,7 +488,7 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">Log Format</label>
+              <span className="label">Log Format</span>
               <select className="input">
                 <option value="json" selected>JSON</option>
                 <option value="text">Text</option>
@@ -516,18 +496,32 @@ const Settings = () => {
             </div>
 
             <div>
-              <label className="label">Log Output</label>
+              <span className="label">Log Output</span>
               <select className="input">
                 <option value="stdout" selected>Standard Output</option>
                 <option value="file">File</option>
               </select>
             </div>
           </div>
-
-          <button className="btn btn-primary w-full mt-6">
-            Save Logging Settings
-          </button>
         </div>
+      </div>
+
+      {/* Unified Save/Cancel Buttons */}
+      <div className="mt-8 flex justify-end gap-4">
+        <button
+          onClick={loadAppSettings}
+          className="btn btn-secondary"
+          disabled={loading}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSaveAppSettings}
+          disabled={loading}
+          className="btn btn-primary disabled:opacity-50"
+        >
+          {loading ? 'Saving...' : 'Save All Settings'}
+        </button>
       </div>
     </div>
   )
