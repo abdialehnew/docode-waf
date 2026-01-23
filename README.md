@@ -193,6 +193,7 @@ docode-waf/
 - **CAPTCHA**: Cloudflare Turnstile
 - **Code Editor**: CodeMirror (@uiw/react-codemirror)
 - **Syntax Highlighting**: Custom Nginx language mode
+- **Alerts/Dialogs**: SweetAlert2
 
 ### DevOps
 - **Containerization**: Docker & Docker Compose
