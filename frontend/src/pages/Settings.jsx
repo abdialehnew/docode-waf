@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Upload, X, Mail, Eye, EyeOff } from 'lucide-react'
+import Swal from 'sweetalert2'
 import api from '../services/api'
 import logger from '../utils/logger'
 
@@ -46,13 +47,21 @@ const Settings = () => {
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file')
+        Swal.fire({
+          icon: 'error',
+          title: 'Invalid File',
+          text: 'Please select an image file'
+        })
         return
       }
 
       // Validate file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
-        alert('Logo file size must be less than 2MB')
+        Swal.fire({
+          icon: 'error',
+          title: 'File Too Large',
+          text: 'Logo file size must be less than 2MB'
+        })
         return
       }
 
@@ -75,12 +84,22 @@ const Settings = () => {
     setLoading(true)
     try {
       await api.post('/settings/app', appSettings)
-      alert('Application settings saved successfully!')
+      await Swal.fire({
+        icon: 'success',
+        title: 'Saved!',
+        text: 'Application settings saved successfully!',
+        timer: 2000,
+        showConfirmButton: false
+      })
       // Reload page to update logo in sidebar
       globalThis.location.reload()
     } catch (error) {
       logger.error('Failed to save app settings:', error)
-      alert('Failed to save settings: ' + (error.response?.data?.error || error.message))
+      Swal.fire({
+        icon: 'error',
+        title: 'Save Failed',
+        text: 'Failed to save settings: ' + (error.response?.data?.error || error.message)
+      })
     } finally {
       setLoading(false)
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Swal from 'sweetalert2'
 import api, { getVHosts, createVHost, deleteVHost, regenerateAllConfigs } from '../services/api'
 import { Plus, Trash2, Edit, Server, Search, Grid3x3, List, ChevronUp, ChevronDown, ChevronsUpDown, ChevronDown as ChevronDownIcon, CheckCircle, AlertCircle, Loader2, Shield, Eye, ExternalLink, ChevronLeft, ChevronRight, FileCode, Globe, RefreshCw } from 'lucide-react'
 import logger from '../utils/logger'
@@ -293,13 +294,27 @@ const VHosts = () => {
         const { count, errors } = response.data
         if (errors && errors.length > 0) {
           logger.warn('Some configs had errors:', errors)
-          alert(`Regenerated ${count} configs with ${errors.length} errors. Check console for details.`)
+          Swal.fire({
+            icon: 'warning',
+            title: 'Partial Success',
+            text: `Regenerated ${count} configs with ${errors.length} errors. Check console for details.`
+          })
         } else {
-          alert(`Successfully regenerated ${count} nginx configuration files!`)
+          Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: `Successfully regenerated ${count} nginx configuration files!`,
+            timer: 2000,
+            showConfirmButton: false
+          })
         }
       } catch (error) {
         logger.error('Failed to regenerate configs:', error)
-        alert('Failed to regenerate configs: ' + (error.response?.data?.error || error.message))
+        Swal.fire({
+          icon: 'error',
+          title: 'Failed',
+          text: 'Failed to regenerate configs: ' + (error.response?.data?.error || error.message)
+        })
       } finally {
         setRegenerating(false)
         setGlobalLoading(false)
