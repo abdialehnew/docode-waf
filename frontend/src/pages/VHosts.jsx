@@ -1077,6 +1077,7 @@ const VHosts = () => {
                     </div>
                   )}
                 </div>
+              )}
 
               {/* Custom Nginx Config */}
               <div>
