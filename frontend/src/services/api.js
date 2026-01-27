@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api/v1',
-  timeout: 10000,
+  timeout: 120000,
 })
 
 // Add token to requests
@@ -43,7 +43,7 @@ export const getTrafficLogs = (limit = 100, offset = 0) =>
   api.get('/dashboard/traffic', { params: { limit, offset } })
 
 export const getTrafficCountries = () => api.get('/traffic/countries')
-export const getTrafficIPs = (countryCodes = []) => 
+export const getTrafficIPs = (countryCodes = []) =>
   api.get('/traffic/ips', { params: { country_code: countryCodes } })
 
 export const getAttacksByCountry = (params = {}) =>
