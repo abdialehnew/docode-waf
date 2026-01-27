@@ -10,11 +10,13 @@ import (
 
 type CertificateHandler struct {
 	certService *services.CertificateService
+	acmeService *services.ACMEService
 }
 
-func NewCertificateHandler(certService *services.CertificateService) *CertificateHandler {
+func NewCertificateHandler(certService *services.CertificateService, acmeService *services.ACMEService) *CertificateHandler {
 	return &CertificateHandler{
 		certService: certService,
+		acmeService: acmeService,
 	}
 }
 
@@ -173,6 +175,51 @@ func (h *CertificateHandler) UploadCertificate(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":     "Certificate uploaded successfully",
+		"certificate": certificate,
+	})
+}
+
+// GenerateCertificate handles certificate generation via Let's Encrypt
+func (h *CertificateHandler) GenerateCertificate(c *gin.Context) {
+	var input struct {
+		Domain string `json:"domain" binding:"required"`
+		Email  string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Request certificate from Let's Encrypt
+	certs, err := h.acmeService.ObtainCertificate(input.Domain, input.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate certificate: " + err.Error()})
+		return
+	}
+
+	// Create certificate input for DB
+	certInput := &models.CertificateInput{
+		Name:        input.Domain,
+		CertContent: string(certs.Certificate),
+		KeyContent:  string(certs.PrivateKey),
+	}
+
+	// Save to DB
+	certificate, err := h.certService.CreateCertificate(certInput)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save generated certificate: " + err.Error()})
+		return
+	}
+
+	// Save files to filesystem
+	if err := h.certService.SaveCertificateFiles(certificate.ID, []byte(certInput.CertContent), []byte(certInput.KeyContent)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save certificate files: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":     "Certificate generated successfully",
 		"certificate": certificate,
 	})
 }

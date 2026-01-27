@@ -12,12 +12,17 @@ const Certificates = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null, title: '', message: '' });
-  
+
+  // Generate SSL state
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateData, setGenerateData] = useState({ domain: '', email: '' });
+  const [isGenerating, setIsGenerating] = useState(false);
+
   // Datatable states
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     cert_content: '',
@@ -169,6 +174,32 @@ const Certificates = () => {
     setCurrentPage(1);
   };
 
+  // Handle Generate Submit
+  const handleGenerateSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setIsGenerating(true);
+
+    try {
+      if (!generateData.domain || !generateData.email) {
+        setError('Please provide both domain and email');
+        setIsGenerating(false);
+        return;
+      }
+
+      await api.post('/certificates/generate', generateData);
+      setSuccess('Certificate generated successfully');
+      setShowGenerateModal(false);
+      setGenerateData({ domain: '', email: '' });
+      fetchCertificates();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to generate certificate');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -185,13 +216,22 @@ const Certificates = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">SSL Certificates</h1>
           <p className="text-gray-600">Manage SSL/TLS certificates for your domains</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-        >
-          <Plus className="w-5 h-5" />
-          Add Certificate
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowGenerateModal(true)}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition"
+          >
+            <Shield className="w-5 h-5" />
+            Generate SSL
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+          >
+            <Plus className="w-5 h-5" />
+            Upload Certificate
+          </button>
+        </div>
       </div>
 
       {/* Alerts */}
@@ -349,7 +389,7 @@ const Certificates = () => {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                
+
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                   if (
                     page === 1 ||
@@ -360,11 +400,10 @@ const Certificates = () => {
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
-                        className={`px-3 py-1 rounded transition ${
-                          page === currentPage
+                        className={`px-3 py-1 rounded transition ${page === currentPage
                             ? 'bg-blue-600 text-white'
                             : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         {page}
                       </button>
@@ -508,6 +547,86 @@ const Certificates = () => {
                     setError('');
                   }}
                   className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Certificate Modal */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full">
+            <div className="p-6 border-b border-gray-700">
+              <h2 className="text-2xl font-bold text-white">Generate SSL Certificate</h2>
+              <p className="text-gray-400 text-sm mt-1">Using Let's Encrypt (HTTP-01 Challenge)</p>
+            </div>
+
+            <form onSubmit={handleGenerateSubmit} className="p-6 space-y-4">
+              <div className="bg-blue-900/30 border border-blue-800 rounded p-4 mb-4">
+                <p className="text-blue-200 text-sm">
+                  <AlertCircle className="w-4 h-4 inline mr-2" />
+                  Ensure your domain points to this server's public IP (port 80) for validation to succeed.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Domain Name *
+                </label>
+                <input
+                  type="text"
+                  value={generateData.domain}
+                  onChange={(e) => setGenerateData({ ...generateData, domain: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., example.com"
+                  required
+                  disabled={isGenerating}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  value={generateData.email}
+                  onChange={(e) => setGenerateData({ ...generateData, email: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="For Let's Encrypt notifications"
+                  required
+                  disabled={isGenerating}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="submit"
+                  disabled={isGenerating}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    'Generate Certificate'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={isGenerating}
+                  onClick={() => {
+                    setShowGenerateModal(false);
+                    setGenerateData({ domain: '', email: '' });
+                    setError('');
+                  }}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition disabled:opacity-50"
                 >
                   Cancel
                 </button>

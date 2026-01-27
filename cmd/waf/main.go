@@ -198,12 +198,12 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 
 		// IP Groups
 		protected.GET("/ip-groups", ipGroupHandler.ListIPGroups)
-		protected.GET("/ip-groups/:id", ipGroupHandler.GetIPGroup)
+		protected.GET(RouteIPGroupsID, ipGroupHandler.GetIPGroup)
 		protected.POST("/ip-groups", ipGroupHandler.CreateIPGroup)
-		protected.PUT("/ip-groups/:id", ipGroupHandler.UpdateIPGroup)
-		protected.DELETE("/ip-groups/:id", ipGroupHandler.DeleteIPGroup)
-		protected.GET("/ip-groups/:id/addresses", ipGroupHandler.GetIPAddresses)
-		protected.POST("/ip-groups/:id/addresses", ipGroupHandler.AddIPAddress)
+		protected.PUT(RouteIPGroupsID, ipGroupHandler.UpdateIPGroup)
+		protected.DELETE(RouteIPGroupsID, ipGroupHandler.DeleteIPGroup)
+		protected.GET(RouteIPGroupAddress, ipGroupHandler.GetIPAddresses)
+		protected.POST(RouteIPGroupAddress, ipGroupHandler.AddIPAddress)
 		protected.PUT("/ip-groups/:id/addresses/:addressId", ipGroupHandler.UpdateIPAddress)
 		protected.DELETE("/ip-groups/:id/addresses/:addressId", ipGroupHandler.DeleteIPAddress)
 
@@ -211,6 +211,7 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		protected.GET("/certificates", certHandler.GetCertificates)
 		protected.GET(constants.RouteCertificateID, certHandler.GetCertificate)
 		protected.POST("/certificates", certHandler.CreateCertificate)
+		protected.POST("/certificates/generate", certHandler.GenerateCertificate)
 		protected.POST("/certificates/upload", certHandler.UploadCertificate)
 		protected.PUT(constants.RouteCertificateID, certHandler.UpdateCertificate)
 		protected.DELETE(constants.RouteCertificateID, certHandler.DeleteCertificate)
@@ -244,29 +245,60 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 	}
 }
 
-func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *services.NginxConfigService,
-	vhostService *services.VHostService, certService *services.CertificateService, authService *services.AuthService, reverseProxyHandler *proxy.ReverseProxy) *http.Server {
+// ServerServices bundles services for the server
+type ServerServices struct {
+	Config              *config.Config
+	DB                  *sqlx.DB
+	NginxConfigService  *services.NginxConfigService
+	VHostService        *services.VHostService
+	CertService         *services.CertificateService
+	AuthService         *services.AuthService
+	ReverseProxyHandler *proxy.ReverseProxy
+}
+
+const (
+	RouteIPGroupsID     = "/ip-groups/:id"
+	RouteIPGroupAddress = "/ip-groups/:id/addresses"
+)
+
+func setupAdminServer(s *ServerServices) *http.Server {
+
+	// Initialize services
+	acmeService := services.NewACMEService()
 
 	// Initialize email service
-	emailService := services.NewEmailService(db)
+	emailService := services.NewEmailService(s.DB)
 
 	// Initialize API handlers
-	vhostHandler := api.NewVHostHandler(db, nginxConfigService, vhostService, certService, reverseProxyHandler)
-	ipGroupHandler := api.NewIPGroupHandler(db)
-	dashboardHandler := api.NewDashboardHandler(db)
-	authHandler := api.NewAuthHandler(authService, emailService, cfg, db)
-	certHandler := api.NewCertificateHandler(certService)
-	settingsHandler := api.NewSettingsHandler(db)
-	blockingHandler := api.NewBlockingRuleHandler(db)
-	rateLimitHandler := api.NewRateLimitHandler(db)
-	logsHandler := api.NewLogsHandler(db)
-	trafficFiltersHandler := api.NewTrafficFiltersHandler(db)
+	vhostHandler := api.NewVHostHandler(s.DB, s.NginxConfigService, s.VHostService, s.CertService, s.ReverseProxyHandler)
+	ipGroupHandler := api.NewIPGroupHandler(s.DB)
+	dashboardHandler := api.NewDashboardHandler(s.DB)
+	authHandler := api.NewAuthHandler(s.AuthService, emailService, s.Config, s.DB)
+	certHandler := api.NewCertificateHandler(s.CertService, acmeService)
+	settingsHandler := api.NewSettingsHandler(s.DB)
+	blockingHandler := api.NewBlockingRuleHandler(s.DB)
+	rateLimitHandler := api.NewRateLimitHandler(s.DB)
+	logsHandler := api.NewLogsHandler(s.DB)
+	trafficFiltersHandler := api.NewTrafficFiltersHandler(s.DB)
 
-	// Setup admin API
+	// Setup ACME HTTP-01 Handler
+	// All WAF instances should share the ability to solve challenges if they are behind a load balancer,
+	// but here we assume a single instance handling the challenge or sticky sessions.
+	// For distributed setups, a shared storage (Redis) for the provider would be needed.
 	adminRouter := gin.Default()
 
+	// Handle ACME Challenge
+	adminRouter.GET("/.well-known/acme-challenge/:token", func(c *gin.Context) {
+		token := c.Param("token")
+		if keyAuth, ok := acmeService.GetHTTPProvider().GetKeyAuth(token); ok {
+			c.String(http.StatusOK, keyAuth)
+		} else {
+			c.String(http.StatusNotFound, "Challenge not found")
+		}
+	})
+
 	// Get allowed origins from config
-	allowedOrigins := cfg.GetCORSAllowedOrigins()
+	allowedOrigins := s.Config.GetCORSAllowedOrigins()
 
 	// CORS middleware
 	adminRouter.Use(func(c *gin.Context) {
@@ -306,7 +338,7 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 
 	// API routes
 	apiV1 := adminRouter.Group("/api/v1")
-	setupAPIRoutes(apiV1, authService, authHandler, dashboardHandler, vhostHandler, ipGroupHandler, certHandler, settingsHandler, blockingHandler, rateLimitHandler, logsHandler, trafficFiltersHandler, cfg)
+	setupAPIRoutes(apiV1, s.AuthService, authHandler, dashboardHandler, vhostHandler, ipGroupHandler, certHandler, settingsHandler, blockingHandler, rateLimitHandler, logsHandler, trafficFiltersHandler, s.Config)
 
 	// Health check
 	adminRouter.GET("/health", func(c *gin.Context) {
@@ -315,10 +347,10 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 
 	// Create server
 	adminServer := &http.Server{
-		Addr:         cfg.GetAdminAddr(),
+		Addr:         s.Config.GetAdminAddr(),
 		Handler:      adminRouter,
-		ReadTimeout:  cfg.Server.ReadTimeout,
-		WriteTimeout: cfg.Server.WriteTimeout,
+		ReadTimeout:  s.Config.Server.ReadTimeout,
+		WriteTimeout: s.Config.Server.WriteTimeout,
 	}
 
 	go func() {
@@ -382,7 +414,17 @@ func main() {
 
 	// Start servers
 	wafServer := setupWAFServer(cfg, redisClient, db, reverseProxyHandler)
-	adminServer := setupAdminServer(cfg, db, nginxConfigService, vhostService, certService, authService, reverseProxyHandler)
+
+	serverServices := &ServerServices{
+		Config:              cfg,
+		DB:                  db,
+		NginxConfigService:  nginxConfigService,
+		VHostService:        vhostService,
+		CertService:         certService,
+		AuthService:         authService,
+		ReverseProxyHandler: reverseProxyHandler,
+	}
+	adminServer := setupAdminServer(serverServices)
 
 	// Wait for shutdown signal
 	gracefulShutdown(wafServer, adminServer)
