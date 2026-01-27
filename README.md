@@ -61,7 +61,7 @@ This project is committed to maintaining high security and code quality standard
   - **ip-api.com Integration** - Free GeoIP lookup (45 requests/minute)
   - **Custom Blocked Page** - Beautiful gradient page with country info
 - ✅ **URL Filtering** - Pattern-based URL blocking
-- ✅ **SSL Certificate Management** - Upload and manage SSL certificates per domain
+- ✅ **SSL Certificate Management** - Upload, **generate (Let's Encrypt)**, and manage SSL certificates per domain
 - ✅ **HTTP Flood Protection** - Protect against DDoS and HTTP flood attacks
 - ✅ **Bot Detection (Per-VHost)** - Advanced bot detection with multiple challenge types:
   - **Cloudflare Turnstile** - Modern CAPTCHA with Force Interactive mode
@@ -181,6 +181,7 @@ docode-waf/
 - **Authentication**: JWT
 - **Proxy**: Nginx
 - **GeoIP**: MaxMind GeoLite2
+- **ACME**: go-acme/lego (Let's Encrypt)
 
 ### Frontend
 - **Framework**: React 18
@@ -463,6 +464,39 @@ server {
 
 ---
 
+## 🔐 SSL Management
+
+### Generate with Let's Encrypt
+
+DCode WAF integrates with **Let's Encrypt** to provide free, automated SSL certificates.
+
+**Prerequisites:**
+1.  **Public Access**: The domain **must** point to this server's public IP.
+2.  **Port 80**: Port 80 must be accessible from the internet (for HTTP-01 challenge).
+
+**Steps:**
+1.  Navigate to **SSL Certificates** page.
+2.  Click **"Generate SSL"**.
+3.  Enter:
+    - **Domain Name**: e.g., `example.com`
+    - **Email Address**: For expiry notifications (required by Let's Encrypt).
+4.  Click **"Generate Certificate"**.
+5.  Once successful, the certificate will appear in the list and can be assigned to a Virtual Host.
+
+### Upload Custom Certificate
+
+If you have your own certificate (e.g., from Cloudflare, ZeroSSL, or specific CA):
+
+1.  Navigate to **SSL Certificates** page.
+2.  Click **"Upload Certificate"**.
+3.  Provide:
+    - **Name**: Friendly identifier.
+    - **Certificate File**: `.crt`, `.pem`, or `.cer`.
+    - **Private Key File**: `.key` or `.pem`.
+4.  Click **"Upload"**.
+
+---
+
 ## 🔍 Attack Detection Patterns
 
 ### SQL Injection
@@ -716,6 +750,7 @@ POST   /api/v1/settings/app     # Update app settings
 ```
 GET    /api/v1/certificates     # List certificates
 POST   /api/v1/certificates     # Upload certificate
+POST   /api/v1/certificates/generate # Generate Let's Encrypt certificate
 DELETE /api/v1/certificates/:id # Delete certificate
 ```
 
