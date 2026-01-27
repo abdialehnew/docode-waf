@@ -358,6 +358,11 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		input.LoadBalanceMethod = "round_robin"
 	}
 
+	// Sanitize SSL Certificate ID
+	if input.SSLCertificateID != nil && *input.SSLCertificateID == "" {
+		input.SSLCertificateID = nil
+	}
+
 	query := `
 		INSERT INTO vhosts (id, name, domain, backend_url, backends, load_balance_method, custom_config,
 		                   ssl_enabled, ssl_certificate_id, ssl_cert_path, ssl_key_path, enabled,
@@ -543,6 +548,11 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	}
 	if input.Backends == nil {
 		input.Backends = []string{}
+	}
+
+	// Sanitize SSL Certificate ID
+	if input.SSLCertificateID != nil && *input.SSLCertificateID == "" {
+		input.SSLCertificateID = nil
 	}
 	if input.LoadBalanceMethod == "" {
 		input.LoadBalanceMethod = "round_robin"

@@ -182,8 +182,11 @@ func (h *CertificateHandler) UploadCertificate(c *gin.Context) {
 // GenerateCertificate handles certificate generation via Let's Encrypt
 func (h *CertificateHandler) GenerateCertificate(c *gin.Context) {
 	var input struct {
-		Domain string `json:"domain" binding:"required"`
-		Email  string `json:"email" binding:"required,email"`
+		Domain             string `json:"domain" binding:"required"`
+		Email              string `json:"email" binding:"required,email"`
+		IsWildcard         bool   `json:"is_wildcard"`
+		DNSProvider        string `json:"dns_provider"`
+		CloudflareAPIToken string `json:"cloudflare_api_token"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -191,16 +194,41 @@ func (h *CertificateHandler) GenerateCertificate(c *gin.Context) {
 		return
 	}
 
+	// Prepare credentials map
+	credentials := make(map[string]string)
+	if input.DNSProvider == "cloudflare" {
+		credentials["cloudflare_api_token"] = input.CloudflareAPIToken
+	}
+
+	// Adjust domain for wildcard
+	targetDomain := input.Domain
+	if input.IsWildcard {
+		// Ensure domain starts with *.
+		if len(targetDomain) < 2 || targetDomain[:2] != "*." {
+			targetDomain = "*." + targetDomain
+		}
+		// Wildcard requires DNS-01
+		if input.DNSProvider == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Wildcard certificates require a DNS provider (e.g., Cloudflare)"})
+			return
+		}
+	}
+
 	// Request certificate from Let's Encrypt
-	certs, err := h.acmeService.ObtainCertificate(input.Domain, input.Email)
+	certs, err := h.acmeService.ObtainCertificate(targetDomain, input.Email, input.DNSProvider, credentials)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate certificate: " + err.Error()})
 		return
 	}
 
 	// Create certificate input for DB
+	certName := targetDomain
+	if input.IsWildcard {
+		certName = "Wildcard " + input.Domain
+	}
+
 	certInput := &models.CertificateInput{
-		Name:        input.Domain,
+		Name:        certName,
 		CertContent: string(certs.Certificate),
 		KeyContent:  string(certs.PrivateKey),
 	}

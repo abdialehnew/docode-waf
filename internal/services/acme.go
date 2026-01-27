@@ -12,6 +12,7 @@ import (
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
+	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
 	"github.com/go-acme/lego/v4/registration"
 )
 
@@ -82,7 +83,7 @@ func (s *ACMEService) GetHTTPProvider() *InMemoryHTTPProvider {
 	return s.httpProvider
 }
 
-func (s *ACMEService) ObtainCertificate(domain, email string) (*certificate.Resource, error) {
+func (s *ACMEService) ObtainCertificate(domain, email string, provider string, credentials map[string]string) (*certificate.Resource, error) {
 	// Create a user. In a real application, you'd want to persist the user/private key.
 	// For now, we generate a new one for each request (ephemeral user).
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -114,10 +115,32 @@ func (s *ACMEService) ObtainCertificate(domain, email string) (*certificate.Reso
 	}
 	user.Registration = reg
 
-	// Set HTTP provider
-	err = client.Challenge.SetHTTP01Provider(s.httpProvider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set HTTP-01 provider: %w", err)
+	// Set Challenge Provider
+	if provider == "cloudflare" {
+		apiToken, ok := credentials["cloudflare_api_token"]
+		if !ok || apiToken == "" {
+			return nil, fmt.Errorf("cloudflare API token is required")
+		}
+
+		cfConfig := cloudflare.NewDefaultConfig()
+		cfConfig.AuthToken = apiToken
+
+		dnsProvider, err := cloudflare.NewDNSProviderConfig(cfConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cloudflare DNS provider: %w", err)
+		}
+
+		if err := client.Challenge.SetDNS01Provider(dnsProvider); err != nil {
+			return nil, fmt.Errorf("failed to set DNS-01 provider: %w", err)
+		}
+		log.Printf("[ACME] Using Cloudflare DNS-01 provider for domain %s", domain)
+	} else {
+		// Default to HTTP-01
+		err = client.Challenge.SetHTTP01Provider(s.httpProvider)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set HTTP-01 provider: %w", err)
+		}
+		log.Printf("[ACME] Using HTTP-01 provider for domain %s", domain)
 	}
 
 	request := certificate.ObtainRequest{

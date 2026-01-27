@@ -480,8 +480,11 @@ DCode WAF integrates with **Let's Encrypt** to provide free, automated SSL certi
 3.  Enter:
     - **Domain Name**: e.g., `example.com`
     - **Email Address**: For expiry notifications (required by Let's Encrypt).
-4.  Click **"Generate Certificate"**.
-5.  Once successful, the certificate will appear in the list and can be assigned to a Virtual Host.
+4.  **Wildcard Support (Optional)**:
+    - Check **"Wildcard Certificate"** to generate `*.example.com`.
+    - Requires **Cloudflare API Token** with `Zone:DNS:Edit` permission (system handles DNS-01 challenge).
+5.  Click **"Generate Certificate"**.
+6.  Once successful, the certificate will appear in the list and can be assigned to a Virtual Host.
 
 ### Upload Custom Certificate
 

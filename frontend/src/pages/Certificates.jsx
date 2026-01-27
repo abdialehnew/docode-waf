@@ -401,8 +401,8 @@ const Certificates = () => {
                         key={page}
                         onClick={() => handlePageChange(page)}
                         className={`px-3 py-1 rounded transition ${page === currentPage
-                            ? 'bg-blue-600 text-white'
-                            : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
                           }`}
                       >
                         {page}
@@ -602,6 +602,59 @@ const Certificates = () => {
                   disabled={isGenerating}
                 />
               </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={generateData.is_wildcard || false}
+                    onChange={(e) => setGenerateData({ ...generateData, is_wildcard: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-green-600 focus:ring-offset-gray-800 focus:ring-2 focus:ring-green-500"
+                    disabled={isGenerating}
+                  />
+                  Wildcard Certificate (*.{generateData.domain || 'example.com'})
+                </label>
+                <p className="text-xs text-gray-500 ml-6">
+                  Requires DNS validation. Currently supports Cloudflare.
+                </p>
+              </div>
+
+              {generateData.is_wildcard && (
+                <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-600 space-y-3">
+                  <h3 className="text-sm font-medium text-white">DNS Provider Settings</h3>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      DNS Provider
+                    </label>
+                    <select
+                      value="cloudflare"
+                      disabled
+                      className="w-full px-4 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white"
+                    >
+                      <option value="cloudflare">Cloudflare</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                      Cloudflare API Token *
+                    </label>
+                    <input
+                      type="password"
+                      value={generateData.cloudflare_api_token || ''}
+                      onChange={(e) => setGenerateData({ ...generateData, cloudflare_api_token: e.target.value, dns_provider: 'cloudflare' })}
+                      className="w-full px-4 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="Token with Zone:DNS:Edit permission"
+                      required={generateData.is_wildcard}
+                      disabled={isGenerating}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Create a token at <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">Cloudflare Dashboard</a>
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button
