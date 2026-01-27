@@ -99,6 +99,19 @@ server {
     listen 80;
     server_name {{.Domain}};
     
+    # ACME Challenge Support (Let's Encrypt)
+    location ^~ /.well-known/acme-challenge/ {
+        proxy_pass http://waf:9090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Disable caching and security checks for validation
+        expires off;
+        access_log on;
+    }
+    
     # Security Headers for HTTP
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
