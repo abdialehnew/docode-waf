@@ -24,6 +24,7 @@ type Admin struct {
 type VHost struct {
 	ID                     string    `json:"id" db:"id"`
 	Name                   string    `json:"name" db:"name"`
+	Type                   string    `json:"type" db:"type"` // proxy, redirect, dead, stream
 	Domain                 string    `json:"domain" db:"domain"`
 	BackendURL             string    `json:"backend_url" db:"backend_url"`
 	Backends               []string  `json:"backends" db:"-"` // Multiple backend URLs for load balancing

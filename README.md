@@ -62,6 +62,12 @@ This project is committed to maintaining high security and code quality standard
   - **Custom Blocked Page** - Beautiful gradient page with country info
 - ✅ **URL Filtering** - Pattern-based URL blocking
 - ✅ **SSL Certificate Management** - Upload, **generate (Let's Encrypt)**, and manage SSL certificates per domain
+  - **Wildcard Support** - Generate `*.example.com` certificates using Cloudflare DNS-01 challenge
+- ✅ **Advanced VHost Types** - Support for multiple host types:
+  - **Proxy Host** - Standard reverse proxy (default)
+  - **Redirect Host** - HTTP 301/302 redirects to target URL
+  - **Dead Host** - Return 404 Not Found
+- ✅ **Multiple Domains** - Support for multiple domain names per Virtual Host (space-separated)
 - ✅ **HTTP Flood Protection** - Protect against DDoS and HTTP flood attacks
 - ✅ **Bot Detection (Per-VHost)** - Advanced bot detection with multiple challenge types:
   - **Cloudflare Turnstile** - Modern CAPTCHA with Force Interactive mode
@@ -485,6 +491,16 @@ DCode WAF integrates with **Let's Encrypt** to provide free, automated SSL certi
     - Requires **Cloudflare API Token** with `Zone:DNS:Edit` permission (system handles DNS-01 challenge).
 5.  Click **"Generate Certificate"**.
 6.  Once successful, the certificate will appear in the list and can be assigned to a Virtual Host.
+
+### Advanced VHost Configuration
+
+**New in v0.01-beta**:
+
+-   **Multiple Domains**: Enter multiple domains separated by spaces (e.g., `example.com www.example.com`).
+-   **VHost Types**:
+    -   **Proxy**: Forwards traffic to a backend service.
+    -   **Redirect**: Redirects all traffic to a specified URL (e.g., redirect `example.com` to `https://newsite.com`).
+    -   **Dead**: Returns a 404 Not Found error for the domain.
 
 ### Upload Custom Certificate
 

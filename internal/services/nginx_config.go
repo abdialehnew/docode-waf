@@ -242,10 +242,19 @@ server {
     }
 {{end}}
     # Proxy to WAF - All requests go through WAF middleware first
+    # Request Handling based on VHost Type
     location / {
         # Rate limiting
         limit_req zone=general burst=100 nodelay;
         
+        {{if eq .Type "dead"}}
+        # Return 404 for dead hosts
+        return 404;
+        {{else if eq .Type "redirect"}}
+        # Return 301 Redirect
+        return 301 {{.BackendURL}}$request_uri;
+        {{else}}
+        # Proxy Type (Default)
         {{if .HasUpstream}}proxy_pass http://{{.UpstreamName}}_backend;
         {{else}}proxy_pass http://waf:8080;
         {{end}}proxy_set_header Host $host;
@@ -275,6 +284,7 @@ server {
         {{if .CustomConfig}}
         # Custom Configuration
         {{.CustomConfig}}{{end}}
+        {{end}}
     }
 }
 `

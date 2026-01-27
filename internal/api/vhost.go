@@ -47,6 +47,7 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 	type VHost struct {
 		ID                  string          `db:"id" json:"id"`
 		Name                string          `db:"name" json:"name"`
+		Type                string          `db:"type" json:"type"`
 		Domain              string          `db:"domain" json:"domain"`
 		BackendURL          string          `db:"backend_url" json:"backend_url"`
 		Backends            *string         `db:"backends" json:"backends"`
@@ -77,7 +78,7 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 	var vhosts []VHost
 
 	query := `
-		SELECT id::text, name, domain, backend_url, 
+		SELECT id::text, name, COALESCE(type, 'proxy') as type, domain, backend_url, 
 		       backends::text as backends, COALESCE(load_balance_method, 'round_robin') as load_balance_method, custom_config,
 		       ssl_enabled, ssl_certificate_id::text, ssl_cert_path, ssl_key_path, enabled,
 		       websocket_enabled, http_version, tls_version, max_upload_size,
@@ -156,6 +157,7 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 		response = append(response, map[string]interface{}{
 			"id":                    vhost.ID,
 			"name":                  vhost.Name,
+			"type":                  vhost.Type,
 			"domain":                vhost.Domain,
 			"backend_url":           vhost.BackendURL,
 			"backends":              backends,
@@ -193,6 +195,7 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 	type VHost struct {
 		ID                  string          `db:"id" json:"id"`
 		Name                string          `db:"name" json:"name"`
+		Type                string          `db:"type" json:"type"`
 		Domain              string          `db:"domain" json:"domain"`
 		BackendURL          string          `db:"backend_url" json:"backend_url"`
 		SSLEnabled          bool            `db:"ssl_enabled" json:"ssl_enabled"`
@@ -215,7 +218,7 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 
 	var vhost VHost
 	query := `
-		SELECT id::text, name, domain, backend_url, ssl_enabled, 
+		SELECT id::text, name, COALESCE(type, 'proxy') as type, domain, backend_url, ssl_enabled, 
 		       ssl_certificate_id::text, ssl_cert_path, ssl_key_path, enabled,
 		       websocket_enabled, http_version, tls_version, max_upload_size,
 		       proxy_read_timeout, proxy_connect_timeout, custom_headers,
@@ -276,6 +279,7 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	var input struct {
 		Name                   string                   `json:"name" binding:"required"`
+		Type                   string                   `json:"type"`
 		Domain                 string                   `json:"domain" binding:"required"`
 		BackendURL             string                   `json:"backend_url" binding:"required"`
 		Backends               []string                 `json:"backends"`
@@ -358,13 +362,18 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		input.LoadBalanceMethod = "round_robin"
 	}
 
+	// Set default type
+	if input.Type == "" {
+		input.Type = "proxy"
+	}
+
 	// Sanitize SSL Certificate ID
 	if input.SSLCertificateID != nil && *input.SSLCertificateID == "" {
 		input.SSLCertificateID = nil
 	}
 
 	query := `
-		INSERT INTO vhosts (id, name, domain, backend_url, backends, load_balance_method, custom_config,
+		INSERT INTO vhosts (id, name, type, domain, backend_url, backends, load_balance_method, custom_config,
 		                   ssl_enabled, ssl_certificate_id, ssl_cert_path, ssl_key_path, enabled,
 		                   websocket_enabled, http_version, tls_version, max_upload_size,
 		                   proxy_read_timeout, proxy_connect_timeout,
@@ -372,13 +381,14 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		                   rate_limit_enabled, rate_limit_requests, rate_limit_window,
 		                   region_whitelist, region_blacklist, region_filtering_enabled,
 		                   custom_headers, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
 		RETURNING id
 	`
 
 	var id string
 	err = h.db.QueryRow(query,
 		input.Name,
+		input.Type,
 		input.Domain,
 		input.BackendURL,
 		backendsJSON,
@@ -483,6 +493,7 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 
 	var input struct {
 		Name                   string                   `json:"name"`
+		Type                   string                   `json:"type"`
 		Domain                 string                   `json:"domain"`
 		BackendURL             string                   `json:"backend_url"`
 		Backends               []string                 `json:"backends"`
@@ -519,15 +530,15 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 
 	query := `
 		UPDATE vhosts 
-		SET name = $1, domain = $2, backend_url = $3, backends = $4, load_balance_method = $5, custom_config = $6,
-		    ssl_enabled = $7, ssl_certificate_id = $8, ssl_cert_path = $9, ssl_key_path = $10, enabled = $11,
-		    websocket_enabled = $12, http_version = $13, tls_version = $14, max_upload_size = $15,
-		    proxy_read_timeout = $16, proxy_connect_timeout = $17,
-		    bot_detection_enabled = $18, bot_detection_type = $19, recaptcha_version = $20,
-		    rate_limit_enabled = $21, rate_limit_requests = $22, rate_limit_window = $23,
-		    region_whitelist = $24, region_blacklist = $25, region_filtering_enabled = $26,
-		    custom_headers = $27, updated_at = $28
-		WHERE id = $29
+		SET name = $1, type = $2, domain = $3, backend_url = $4, backends = $5, load_balance_method = $6, custom_config = $7,
+		    ssl_enabled = $8, ssl_certificate_id = $9, ssl_cert_path = $10, ssl_key_path = $11, enabled = $12,
+		    websocket_enabled = $13, http_version = $14, tls_version = $15, max_upload_size = $16,
+		    proxy_read_timeout = $17, proxy_connect_timeout = $18,
+		    bot_detection_enabled = $19, bot_detection_type = $20, recaptcha_version = $21,
+		    rate_limit_enabled = $22, rate_limit_requests = $23, rate_limit_window = $24,
+		    region_whitelist = $25, region_blacklist = $26, region_filtering_enabled = $27,
+		    custom_headers = $28, updated_at = $29
+		WHERE id = $30
 	`
 
 	// Set defaults
@@ -574,6 +585,7 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 
 	_, err = h.db.Exec(query,
 		input.Name,
+		input.Type,
 		input.Domain,
 		input.BackendURL,
 		backendsJSON,
