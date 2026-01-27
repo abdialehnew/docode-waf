@@ -214,10 +214,14 @@ const VHosts = () => {
       setGlobalLoading(true)
       if (isEditMode && editingVHostId) {
         setLoadingMessage('Updating virtual host...')
-        await api.put(`/vhosts/${editingVHostId}`, formData)
+        // Sanitize domain: replace commas with spaces and remove extra whitespace
+        const sanitizedData = { ...formData, domain: formData.domain.replace(/,/g, ' ').replace(/\s+/g, ' ').trim() }
+        await api.put(`/vhosts/${editingVHostId}`, sanitizedData)
       } else {
         setLoadingMessage('Creating virtual host...')
-        await createVHost(formData)
+        // Sanitize domain
+        const sanitizedData = { ...formData, domain: formData.domain.replace(/,/g, ' ').replace(/\s+/g, ' ').trim() }
+        await createVHost(sanitizedData)
       }
       setShowModal(false)
       setIsEditMode(false)
@@ -904,11 +908,14 @@ const VHosts = () => {
                   id="vhost-domain"
                   type="text"
                   className="input"
-                  placeholder="example.com"
+                  placeholder="example.com www.example.com"
                   value={formData.domain}
                   onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Multiple domains allowed (space separated)
+                </p>
               </div>
 
               <div>
