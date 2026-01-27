@@ -32,6 +32,8 @@ echo ""
 echo -e "${YELLOW}[2/5] Removing containers...${NC}"
 docker compose rm -f waf frontend nginx-proxy || true
 echo -e "${GREEN}✓ Containers removed${NC}"
+sudo rm -rf ./data/nginx/*
+sudo rm -rf ./data/waf/*
 echo ""
 
 # Step 3: Remove old images
@@ -40,13 +42,10 @@ docker rmi docode-waf-waf:latest 2>/dev/null || true
 docker rmi docode-waf-frontend:latest 2>/dev/null || true
 docker rmi docode-waf-nginx-proxy:latest 2>/dev/null || true
 echo -e "${GREEN}✓ Old images removed${NC}"
-sudo rm -rf ./data/nginx/*
-sudo rm -rf ./data/waf/*
 echo ""
 
 # Step 4: Build new images
 echo -e "${YELLOW}[4/5] Building new images...${NC}"
-sudo chmod -R 777 ./data/nginx/cache/proxy/
 sudo chmod -R 777 ./data/redis/*
 sudo chmod -R 777 ./data/postgresql/pgdata/
 docker compose build --no-cache waf nginx-proxy frontend
