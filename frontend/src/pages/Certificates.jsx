@@ -17,6 +17,7 @@ const Certificates = () => {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generateData, setGenerateData] = useState({ domain: '', email: '' });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showToken, setShowToken] = useState(false);
 
   // Datatable states
   const [searchTerm, setSearchTerm] = useState('');
@@ -637,11 +638,21 @@ const Certificates = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                      Cloudflare API Token *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-400">
+                        Cloudflare API Token *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowToken(!showToken)}
+                        className="text-gray-400 hover:text-gray-300"
+                        title={showToken ? "Hide token" : "Show token"}
+                      >
+                        {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     <input
-                      type="password"
+                      type={showToken ? "text" : "password"}
                       value={generateData.cloudflare_api_token || ''}
                       onChange={(e) => setGenerateData({ ...generateData, cloudflare_api_token: e.target.value, dns_provider: 'cloudflare' })}
                       className="w-full px-4 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
