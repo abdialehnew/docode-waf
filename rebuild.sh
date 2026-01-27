@@ -40,6 +40,8 @@ docker rmi docode-waf-waf:latest 2>/dev/null || true
 docker rmi docode-waf-frontend:latest 2>/dev/null || true
 docker rmi docode-waf-nginx-proxy:latest 2>/dev/null || true
 echo -e "${GREEN}✓ Old images removed${NC}"
+sudo rm -f ./data/nginx/*
+sudo rm -f ./data/waf/*
 echo ""
 
 # Step 4: Build new images
