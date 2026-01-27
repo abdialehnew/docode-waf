@@ -197,6 +197,17 @@ func (h *CertificateHandler) GenerateCertificate(c *gin.Context) {
 	// Prepare credentials map
 	credentials := make(map[string]string)
 	if input.DNSProvider == "cloudflare" {
+		if input.CloudflareAPIToken == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cloudflare API token is required for wildcard certificates"})
+			return
+		}
+
+		// Verify token validity
+		if err := h.acmeService.VerifyCloudflareToken(input.CloudflareAPIToken); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Cloudflare API token: " + err.Error()})
+			return
+		}
+
 		credentials["cloudflare_api_token"] = input.CloudflareAPIToken
 	}
 

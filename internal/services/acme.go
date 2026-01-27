@@ -5,9 +5,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/certificate"
@@ -156,4 +159,43 @@ func (s *ACMEService) ObtainCertificate(domain, email string, provider string, c
 	log.Printf("[ACME] Successfully obtained certificate for %s", domain)
 
 	return certificates, nil
+}
+
+// VerifyCloudflareToken verifies if the Cloudflare API token is valid
+func (s *ACMEService) VerifyCloudflareToken(token string) error {
+	req, err := http.NewRequest("GET", "https://api.cloudflare.com/client/v4/user/tokens/verify", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to verify token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("invalid token (status: %d)", resp.StatusCode)
+	}
+
+	var result struct {
+		Success bool `json:"success"`
+		Result  struct {
+			Status string `json:"status"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !result.Success || result.Result.Status != "active" {
+		return fmt.Errorf("token is not active")
+	}
+
+	return nil
 }
