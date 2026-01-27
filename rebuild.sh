@@ -16,6 +16,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Step 0: Git pull
+echo -e "${YELLOW}[0/5] Git pull...${NC}"
+git pull
+echo -e "${GREEN}✓ Git pull${NC}"
+echo ""
+
 # Step 1: Stop containers
 echo -e "${YELLOW}[1/5] Stopping containers...${NC}"
 docker compose stop waf frontend nginx-proxy || true
@@ -39,7 +45,6 @@ echo ""
 # Step 4: Build new images
 echo -e "${YELLOW}[4/5] Building new images...${NC}"
 sudo chmod -R 777 ./data/nginx/cache/proxy/
-sudo chmod -R 777 ./data/nginx/cache/proxy/*
 sudo chmod -R 777 ./data/redis/*
 sudo chmod -R 777 ./data/postgresql/pgdata/
 docker compose build --no-cache waf nginx-proxy frontend
