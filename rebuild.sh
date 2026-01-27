@@ -39,6 +39,8 @@ echo ""
 # Step 4: Build new images
 echo -e "${YELLOW}[4/5] Building new images...${NC}"
 sudo chmod -R 777 ./data/nginx/cache/proxy/
+sudo chmod -R 777 ./data/nginx/cache/proxy/*
+sudo chmod -R 777 ./data/redis/*
 sudo chmod -R 777 ./data/postgresql/pgdata/
 docker compose build --no-cache waf nginx-proxy frontend
 echo -e "${GREEN}✓ Images built successfully${NC}"
