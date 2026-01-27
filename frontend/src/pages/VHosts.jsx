@@ -39,7 +39,8 @@ const VHosts = () => {
 
   const [formData, setFormData] = useState({
     name: '',
-    domain: '',
+    type: 'proxy', // proxy, redirect, dead
+    domain: [], // Changed to array for tag input
     backend_url: '',
     backends: [],
     load_balance_method: 'round_robin',
@@ -214,13 +215,16 @@ const VHosts = () => {
       setGlobalLoading(true)
       if (isEditMode && editingVHostId) {
         setLoadingMessage('Updating virtual host...')
-        // Sanitize domain: replace commas with spaces and remove extra whitespace
-        const sanitizedData = { ...formData, domain: formData.domain.replace(/,/g, ' ').replace(/\s+/g, ' ').trim() }
+        // Sanitize domain
+        const domainString = Array.isArray(formData.domain) ? formData.domain.join(' ') : formData.domain
+        const sanitizedData = { ...formData, domain: domainString }
         await api.put(`/vhosts/${editingVHostId}`, sanitizedData)
       } else {
         setLoadingMessage('Creating virtual host...')
         // Sanitize domain
-        const sanitizedData = { ...formData, domain: formData.domain.replace(/,/g, ' ').replace(/\s+/g, ' ').trim() }
+        // Sanitize domain: join array with space if it's an array, otherwise use as is
+        const domainString = Array.isArray(formData.domain) ? formData.domain.join(' ') : formData.domain
+        const sanitizedData = { ...formData, domain: domainString }
         await createVHost(sanitizedData)
       }
       setShowModal(false)
@@ -228,7 +232,8 @@ const VHosts = () => {
       setEditingVHostId(null)
       setFormData({
         name: '',
-        domain: '',
+        type: 'proxy',
+        domain: [],
         backend_url: '',
         ssl_enabled: false,
         ssl_certificate_id: '',
@@ -381,7 +386,8 @@ const VHosts = () => {
     setEditingVHostId(vhost.id)
     setFormData({
       name: vhost.name || '',
-      domain: vhost.domain || '',
+      type: vhost.type || 'proxy',
+      domain: vhost.domain ? vhost.domain.split(' ') : [],
       backend_url: vhost.backend_url || '',
       backends: vhost.backends || [],
       load_balance_method: vhost.load_balance_method || 'round_robin',
@@ -504,7 +510,8 @@ const VHosts = () => {
             setEditingVHostId(null)
             setFormData({
               name: '',
-              domain: '',
+              type: 'proxy',
+              domain: [],
               backend_url: '',
               ssl_enabled: false,
               ssl_certificate_id: '',
@@ -890,130 +897,186 @@ const VHosts = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">{isEditMode ? 'Edit Virtual Host' : 'Add Virtual Host'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="vhost-name" className="label">Name</label>
-                <input
-                  id="vhost-name"
-                  type="text"
-                  className="input"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="vhost-name" className="label">Name</label>
+                  <input
+                    id="vhost-name"
+                    type="text"
+                    className="input"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="vhost-type" className="label">Host Type</label>
+                  <select
+                    id="vhost-type"
+                    className="input"
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  >
+                    <option value="proxy">Proxy Host</option>
+                    <option value="redirect">Redirect Host</option>
+                    <option value="dead">Dead Host (404)</option>
+                  </select>
+                </div>
               </div>
 
               <div>
-                <label htmlFor="vhost-domain" className="label">Domain</label>
-                <input
-                  id="vhost-domain"
-                  type="text"
-                  className="input"
-                  placeholder="example.com www.example.com"
-                  value={formData.domain}
-                  onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
-                  required
-                />
+                <label className="label">Domain Names</label>
+                <div className="flex flex-wrap items-center gap-2 p-2 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent bg-white">
+                  {formData.domain.map((domain, index) => (
+                    <span key={index} className="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-md flex items-center gap-1">
+                      {domain}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newDomains = [...formData.domain]
+                          newDomains.splice(index, 1)
+                          setFormData({ ...formData, domain: newDomains })
+                        }}
+                        className="hover:text-red-500"
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    className="flex-1 min-w-[120px] outline-none text-sm py-1"
+                    placeholder={formData.domain.length === 0 ? "example.com (Press Enter)" : ""}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ' || e.key === ',') {
+                        e.preventDefault()
+                        const val = e.target.value.trim()
+                        if (val && !formData.domain.includes(val)) {
+                          setFormData({ ...formData, domain: [...formData.domain, val] })
+                          e.target.value = ''
+                        }
+                      } else if (e.key === 'Backspace' && e.target.value === '' && formData.domain.length > 0) {
+                        const newDomains = [...formData.domain]
+                        newDomains.pop()
+                        setFormData({ ...formData, domain: newDomains })
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const val = e.target.value.trim()
+                      if (val && !formData.domain.includes(val)) {
+                        setFormData({ ...formData, domain: [...formData.domain, val] })
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Multiple domains allowed (space separated)
+                  Press Enter, Space, or Comma to add multiple domains
                 </p>
               </div>
 
-              <div>
-                <label htmlFor="vhost-backend" className="label">Backend URL</label>
-                <div className="relative">
-                  <input
-                    id="vhost-backend"
-                    type="text"
-                    className="input pr-10"
-                    placeholder="http://localhost:8000"
-                    value={formData.backend_url}
-                    onChange={(e) => setFormData({ ...formData, backend_url: e.target.value })}
-                    required
-                  />
-                  {backendCheckStatus && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      {backendCheckStatus === 'checking' && (
-                        <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-                      )}
-                      {backendCheckStatus === 'success' && (
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                      )}
-                      {backendCheckStatus === 'error' && (
-                        <AlertCircle className="w-5 h-5 text-red-500" />
-                      )}
+              {formData.type !== 'dead' && (
+                <div>
+                  <label htmlFor="vhost-backend" className="label">
+                    {formData.type === 'redirect' ? 'Forward URL (Redirect Target)' : 'Backend URL'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="vhost-backend"
+                      type="text"
+                      className="input pr-10"
+                      placeholder={formData.type === 'redirect' ? "https://google.com" : "http://localhost:8000"}
+                      value={formData.backend_url}
+                      onChange={(e) => setFormData({ ...formData, backend_url: e.target.value })}
+                      required
+                    />
+                    {backendCheckStatus && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        {backendCheckStatus === 'checking' && (
+                          <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                        )}
+                        {backendCheckStatus === 'success' && (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        )}
+                        {backendCheckStatus === 'error' && (
+                          <AlertCircle className="w-5 h-5 text-red-500" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {backendCheckMessage && (
+                    <p className={`text-xs mt-1 flex items-center gap-1 ${getBackendCheckColor(backendCheckStatus)}`}>
+                      {backendCheckMessage}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Multiple Backends Section - Only for Proxy */}
+              {formData.type === 'proxy' && (
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="label text-sm font-medium">Multiple Backends (Load Balancing)</label>
+                    <span className="text-xs text-gray-500">Optional - for high availability</span>
+                  </div>
+
+                  {/* Existing backends list */}
+                  {formData.backends && formData.backends.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {formData.backends.map((backend, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="input flex-1 text-sm"
+                            value={backend}
+                            onChange={(e) => {
+                              const newBackends = [...formData.backends]
+                              newBackends[index] = e.target.value
+                              setFormData({ ...formData, backends: newBackends })
+                            }}
+                            placeholder="http://backend:8080"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newBackends = formData.backends.filter((_, i) => i !== index)
+                              setFormData({ ...formData, backends: newBackends })
+                            }}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add backend button */}
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, backends: [...(formData.backends || []), ''] })}
+                    className="btn btn-secondary text-xs flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" /> Add Backend Server
+                  </button>
+
+                  {/* Load Balance Method */}
+                  {formData.backends && formData.backends.length > 0 && (
+                    <div className="mt-3">
+                      <label className="label text-sm">Load Balancing Method</label>
+                      <select
+                        className="input text-sm"
+                        value={formData.load_balance_method}
+                        onChange={(e) => setFormData({ ...formData, load_balance_method: e.target.value })}
+                      >
+                        <option value="round_robin">Round Robin (default)</option>
+                        <option value="least_conn">Least Connections</option>
+                        <option value="ip_hash">IP Hash (sticky sessions)</option>
+                      </select>
                     </div>
                   )}
                 </div>
-                {backendCheckMessage && (
-                  <p className={`text-xs mt-1 flex items-center gap-1 ${getBackendCheckColor(backendCheckStatus)}`}>
-                    {backendCheckMessage}
-                  </p>
-                )}
-              </div>
-
-              {/* Multiple Backends Section */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="label text-sm font-medium">Multiple Backends (Load Balancing)</label>
-                  <span className="text-xs text-gray-500">Optional - for high availability</span>
-                </div>
-
-                {/* Existing backends list */}
-                {formData.backends && formData.backends.length > 0 && (
-                  <div className="space-y-2 mb-3">
-                    {formData.backends.map((backend, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          className="input flex-1 text-sm"
-                          value={backend}
-                          onChange={(e) => {
-                            const newBackends = [...formData.backends]
-                            newBackends[index] = e.target.value
-                            setFormData({ ...formData, backends: newBackends })
-                          }}
-                          placeholder="http://backend:8080"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newBackends = formData.backends.filter((_, i) => i !== index)
-                            setFormData({ ...formData, backends: newBackends })
-                          }}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add backend button */}
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, backends: [...(formData.backends || []), ''] })}
-                  className="btn btn-secondary text-xs flex items-center gap-1"
-                >
-                  <Plus className="w-4 h-4" /> Add Backend Server
-                </button>
-
-                {/* Load Balance Method */}
-                {formData.backends && formData.backends.length > 0 && (
-                  <div className="mt-3">
-                    <label className="label text-sm">Load Balancing Method</label>
-                    <select
-                      className="input text-sm"
-                      value={formData.load_balance_method}
-                      onChange={(e) => setFormData({ ...formData, load_balance_method: e.target.value })}
-                    >
-                      <option value="round_robin">Round Robin (default)</option>
-                      <option value="least_conn">Least Connections</option>
-                      <option value="ip_hash">IP Hash (sticky sessions)</option>
-                    </select>
-                  </div>
-                )}
-              </div>
 
               {/* Custom Nginx Config */}
               <div>
