@@ -67,3 +67,4 @@ GeoLite2-Country.mmdb.tar.gz
 !rebuild.sh
 !truncate-logs.sh
 !nginx/*.sh
+waf

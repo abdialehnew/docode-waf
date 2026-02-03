@@ -225,6 +225,7 @@ server {
 {{range .CustomLocations}}
     # Custom Location: {{.Path}}
     location {{.Path}} {
+        rewrite ^{{.Path}}/(.*) /$1 break;
         {{if .HasUpstream}}proxy_pass http://{{.UpstreamName}}_backend;
         {{else if .ProxyPass}}proxy_pass {{.ProxyPass}};
         {{end}}{{if or .HasUpstream .ProxyPass}}proxy_set_header Host $host;
@@ -289,8 +290,8 @@ server {
 }
 `
 
-// GenerateVHostConfig generates nginx configuration for a virtual host
-func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
+// GenerateVHostConfigContent generates the nginx configuration content string
+func (s *NginxConfigService) GenerateVHostConfigContent(data *VHostWithLocations) (string, error) {
 	// Create template with helper function
 	funcMap := template.FuncMap{
 		"hasAPILocation": func(locations []CustomLocation) bool {
@@ -305,9 +306,18 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 
 	tmpl, err := template.New("vhost").Funcs(funcMap).Parse(VHostTemplate)
 	if err != nil {
-		return fmt.Errorf("failed to parse template: %w", err)
+		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+	return buf.String(), nil
+}
+
+// GenerateVHostConfig generates nginx configuration for a virtual host
+func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 	// Prepare vhost with locations
 	upstreamName := sanitizeDomainForUpstream(vhost.Domain)
 	vhostWithLocs := &VHostWithLocations{
@@ -367,6 +377,11 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 		}
 	}
 
+	content, err := s.GenerateVHostConfigContent(vhostWithLocs)
+	if err != nil {
+		return err
+	}
+
 	// Create config directory if not exists
 	if err := os.MkdirAll(constants.NginxConfigDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
@@ -380,9 +395,8 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 	}
 	defer file.Close()
 
-	// Execute template
-	if err := tmpl.Execute(file, vhostWithLocs); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
+	if _, err := file.WriteString(content); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	return nil
