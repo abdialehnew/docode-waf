@@ -320,12 +320,20 @@ func (s *NginxConfigService) GenerateVHostConfigContent(data *VHostWithLocations
 func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 	// Prepare vhost with locations
 	upstreamName := sanitizeDomainForUpstream(vhost.Domain)
+	// If there are additional backends, prepend backend_url to form the full upstream
+	allBackends := vhost.Backends
+	if len(allBackends) > 0 && vhost.BackendURL != "" {
+		allBackends = append([]string{vhost.BackendURL}, allBackends...)
+	}
+
 	vhostWithLocs := &VHostWithLocations{
 		VHost:           vhost,
 		CustomLocations: []CustomLocation{},
 		UpstreamName:    upstreamName,
-		HasUpstream:     len(vhost.Backends) > 0,
+		HasUpstream:     len(allBackends) > 0,
 	}
+	// Override backends with the full list including backend_url
+	vhostWithLocs.Backends = allBackends
 
 	// Fetch custom locations from database if db is available
 	if s.db != nil {

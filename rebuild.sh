@@ -32,7 +32,8 @@ echo ""
 echo -e "${YELLOW}[2/5] Removing containers...${NC}"
 docker compose rm -f waf frontend nginx-proxy || true
 echo -e "${GREEN}✓ Containers removed${NC}"
-sudo rm -rf ./data/nginx/*
+sudo rm -rf ./data/nginx/cache/*
+sudo rm -rf ./data/nginx/logs/*
 sudo rm -rf ./data/waf/*
 echo ""
 

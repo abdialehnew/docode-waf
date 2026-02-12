@@ -44,13 +44,15 @@ type VHost struct {
 
 // VHostLocation represents a specific path location within a vhost
 type VHostLocation struct {
-	ID         string    `json:"id" db:"id"`
-	VHostID    string    `json:"vhost_id" db:"vhost_id"`
-	Path       string    `json:"path" db:"path"`
-	BackendURL string    `json:"backend_url" db:"backend_url"`
-	Enabled    bool      `json:"enabled" db:"enabled"`
-	CreatedAt  time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
+	ID                string   `json:"id" db:"id"`
+	VHostID           string   `json:"vhost_id" db:"vhost_id"`
+	Path              string   `json:"path" db:"path"`
+	BackendURL        string   `json:"backend_url" db:"backend_url"`
+	Backends          []string `json:"backends" db:"-"` // Multiple backend URLs for load balancing
+	LoadBalanceMethod string   `json:"load_balance_method" db:"load_balance_method"`
+	Enabled           bool     `json:"enabled" db:"enabled"`
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // IPGroup represents a group of IP addresses

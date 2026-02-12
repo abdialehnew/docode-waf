@@ -76,6 +76,10 @@ This project is committed to maintaining high security and code quality standard
   - **Slide Puzzle** - Custom puzzle challenge
 - ✅ **Rate Limiter (Per-VHost)** - Configurable request limits with beautiful countdown page
 - ✅ **Application Branding** - Custom app name and logo configuration
+- ✅ **Dynamic IP Banning** - Automatically ban IPs that trigger multiple security violations (Fail2Ban style)
+  - Configurable threshold (e.g., 10 violations in 1 minute)
+  - Temporary bans with configurable duration
+  - Manual unban via dashboard
 
 ### Attack Detection
 - 🔍 **SQL Injection** - Pattern matching for SQL injection attempts
@@ -97,11 +101,15 @@ This project is committed to maintaining high security and code quality standard
 - 🛡️ **Per-VHost Bot Detection** - Enable/disable and configure bot challenges per domain
 - ⏱️ **Per-VHost Rate Limiting** - Set custom rate limits (requests/window) per domain
 - 🎨 **Application Settings** - Configure app name, logo, and branding
-- 📝 **Nginx Config Editor** - Edit vhost configs with syntax highlighting (Monokai theme)
+- 📝 **Bidirectional Config Editor** - Form & Code Editor in sync with Nginx syntax highlighting
 - 🔄 **Auto-Backup** - Automatic backup before config changes
-- 📍 **Custom Locations** - Define custom location blocks per vhost
+- 📍 **Custom Locations** - Advanced routing with load balancing per location
 - 🏷️ **Custom Headers** - Add custom HTTP headers per vhost
 - 🗑️ **Auto Cleanup** - Delete log files when vhost is removed
+- 🔔 **Notification System** - Real-time alerts for security events
+  - Support for **Slack**, **Discord**, **Email**, and **Generic Webhooks**
+  - Instant alerts for high-severity attacks (SQLi, Admin Scan) and IP bans
+  - Configurable via "Notification Channels" UI
 
 ### Monitoring & Logging
 - 📋 **Centralized Logging** - Unified interface for all system logs
@@ -385,7 +393,9 @@ Confirm new password:
 3. Fill in details:
    - **Name**: Friendly name (e.g., "My API Server")
    - **Domain**: example.com
-   - **Backend URL**: http://backend:9101
+   - **Backend Servers**: 
+     - Enter primary backend URL (e.g., `http://backend:8080`)
+     - Click **"Add Backend Server"** for load balancing (Round Robin, Least Conn, IP Hash)
    - **Enable SSL**: Toggle on
    - **SSL Certificate**: Select from dropdown
    - **Advanced Settings**:
@@ -395,14 +405,16 @@ Confirm new password:
      - Max upload size (MB)
      - Proxy timeouts
      - Custom Headers (JSON object)
-     - Custom Location Blocks (path, proxy_pass, custom config)
+     - Custom Location Blocks (path, proxy_pass, load balancing, custom config)
 4. Click **"Save"**
 
 ### Edit Nginx Config
 
 1. Navigate to **Virtual Hosts** page
-2. Click the **File Code icon** (📄) on any vhost
-3. Edit config with:
+2. Click **Edit** (✏️) on any vhost
+3. Switch to **"Config Editor"** tab
+4. **Bidirectional Sync**: Changes in the Form tab automatically update the Config Editor, and manual edits in the Editor are parsed back to update the Form!
+5. Edit config with:
    - **Syntax Highlighting**: Nginx keywords, strings, comments
    - **Monokai Theme**: Sublime Text style colors
    - **Line Numbers**: Easy navigation
@@ -497,6 +509,9 @@ DCode WAF integrates with **Let's Encrypt** to provide free, automated SSL certi
 **New in v0.01-beta**:
 
 -   **Multiple Domains**: Enter multiple domains separated by spaces (e.g., `example.com www.example.com`).
+-   **Multiple Backends**:
+    -   Add multiple backend servers for load balancing.
+    -   **Load Balancing Methods**: Round Robin, Least Connections, IP Hash.
 -   **VHost Types**:
     -   **Proxy**: Forwards traffic to a backend service.
     -   **Redirect**: Redirects all traffic to a specified URL (e.g., redirect `example.com` to `https://newsite.com`).
@@ -728,6 +743,26 @@ migrate -path migrations -database "postgresql://user:pass@localhost:5432/dbname
 # Rollback migration
 migrate -path migrations -database "postgresql://user:pass@localhost:5432/dbname" down
 ```
+
+### Attack Simulator
+
+Verify WAF protection with the included attack simulator:
+
+```bash
+# Make script executable
+chmod +x attack_simulator.sh
+
+# Run simulation (targets localhost:8080 by default)
+./attack_simulator.sh
+```
+
+**What it tests:**
+- 🛡️ **SQL Injection** detection
+- 🛡️ **XSS** and **Path Traversal** blocking
+- 🛡️ **Bot Detection** (User-Agent checks)
+- 🛡️ **Rate Limiting** triggers
+- 🛡️ **Dynamic IP Banning** (sends rapid attacks to trigger auto-ban)
+- 🔔 **Notification Triggers**
 
 ---
 

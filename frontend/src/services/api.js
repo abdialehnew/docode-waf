@@ -72,4 +72,8 @@ export const removeIPFromGroup = (groupId, ipId) => api.delete(`/ip-groups/${gro
 export const getAppSettings = () => api.get('/settings/app')
 export const getTurnstileSiteKey = () => api.get('/turnstile/sitekey')
 
+// Ban APIs
+export const getBans = () => api.get('/bans')
+export const unbanIP = (id) => api.delete(`/bans/${id}`)
+
 export default api

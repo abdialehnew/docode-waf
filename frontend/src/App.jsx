@@ -7,12 +7,16 @@ import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
 import VHosts from './pages/VHosts'
-import VHostConfigEditor from './pages/VHostConfigEditor'
+import VHostForm from './pages/VHostForm'
 import IPGroups from './pages/IPGroups'
 import TrafficLogs from './pages/TrafficLogs'
 import Certificates from './pages/Certificates'
 import Settings from './pages/Settings'
 import Monitoring from './pages/Monitoring'
+import Bans from './pages/Bans.jsx'
+import NotificationSettings from './pages/NotificationSettings'
+import Rules from './pages/Rules'
+import Reports from './pages/Reports.jsx'
 
 function App() {
   return (
@@ -23,7 +27,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          
+
           {/* Protected routes */}
           <Route path="/" element={
             <ProtectedRoute>
@@ -39,10 +43,17 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/vhost-config/:domain" element={
+          <Route path="/vhosts/new" element={
             <ProtectedRoute>
               <Layout>
-                <VHostConfigEditor />
+                <VHostForm />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/vhosts/:id/edit" element={
+            <ProtectedRoute>
+              <Layout>
+                <VHostForm />
               </Layout>
             </ProtectedRoute>
           } />
@@ -50,6 +61,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <IPGroups />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/bans" element={
+            <ProtectedRoute>
+              <Layout>
+                <Bans />
               </Layout>
             </ProtectedRoute>
           } />
@@ -78,6 +96,27 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Settings />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <Layout>
+                <NotificationSettings />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/rules" element={
+            <ProtectedRoute>
+              <Layout>
+                <Rules />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/reports" element={
+            <ProtectedRoute>
+              <Layout>
+                <Reports />
               </Layout>
             </ProtectedRoute>
           } />

@@ -1,12 +1,14 @@
 package middleware
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/aleh/docode-waf/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"github.com/oschwald/geoip2-golang"
@@ -15,6 +17,10 @@ import (
 var (
 	geoipDB     *geoip2.Reader
 	geoipDBOnce sync.Once
+)
+
+const (
+	attackTypeAdminScan = "Admin Scan"
 )
 
 // initGeoIP initializes the GeoIP database
@@ -69,7 +75,7 @@ func getCountryCode(ip string) string {
 }
 
 // LoggingMiddleware logs all HTTP traffic
-func LoggingMiddleware(db *sqlx.DB) gin.HandlerFunc {
+func LoggingMiddleware(db *sqlx.DB, banService *services.DynamicBanService, notificationService *services.NotificationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
@@ -80,7 +86,7 @@ func LoggingMiddleware(db *sqlx.DB) gin.HandlerFunc {
 		duration := time.Since(start)
 
 		// Log to database asynchronously
-		go logTraffic(db, c, duration)
+		go logTraffic(db, banService, notificationService, c, duration)
 	}
 }
 
@@ -96,7 +102,29 @@ func detectAttackType(c *gin.Context) (bool, string) {
 	url := c.Request.URL.String()
 	userAgent := c.GetHeader("User-Agent")
 
-	// SQL Injection patterns
+	if match, _ := checkSQLInjection(url); match {
+		return true, "SQL Injection"
+	}
+	if match, _ := checkXSS(url); match {
+		return true, "XSS"
+	}
+	if match, _ := checkPathTraversal(url); match {
+		return true, "Path Traversal"
+	}
+	if match, _ := checkCommandInjection(url); match {
+		return true, "Command Injection"
+	}
+	if match, _ := checkAdminScan(url, c.Request.Host); match {
+		return true, attackTypeAdminScan
+	}
+	if match, _ := checkBot(userAgent); match {
+		return true, "Bot Traffic"
+	}
+
+	return false, ""
+}
+
+func checkSQLInjection(url string) (bool, string) {
 	sqlPatterns := []string{"' OR '1'='1", "' OR 1=1", "UNION SELECT", "'; DROP TABLE",
 		"admin'--", "' OR ''='", "1' AND '1'='1", "SELECT * FROM"}
 	for _, pattern := range sqlPatterns {
@@ -104,8 +132,10 @@ func detectAttackType(c *gin.Context) (bool, string) {
 			return true, "SQL Injection"
 		}
 	}
+	return false, ""
+}
 
-	// XSS patterns
+func checkXSS(url string) (bool, string) {
 	xssPatterns := []string{"<script>", "</script>", "javascript:", "onerror=", "onload=",
 		"<img", "alert(", "<iframe"}
 	for _, pattern := range xssPatterns {
@@ -113,69 +143,96 @@ func detectAttackType(c *gin.Context) (bool, string) {
 			return true, "XSS"
 		}
 	}
+	return false, ""
+}
 
-	// Path Traversal
+func checkPathTraversal(url string) (bool, string) {
 	pathTraversalPatterns := []string{"../", "..\\", "/etc/passwd", "windows/system32", "../../"}
 	for _, pattern := range pathTraversalPatterns {
 		if strings.Contains(strings.ToLower(url), strings.ToLower(pattern)) {
 			return true, "Path Traversal"
 		}
 	}
+	return false, ""
+}
 
-	// Command Injection
+func checkCommandInjection(url string) (bool, string) {
 	cmdPatterns := []string{";ls", ";cat", ";whoami", "|ls", "|cat", "&ls", "$("}
 	for _, pattern := range cmdPatterns {
 		if strings.Contains(url, pattern) {
 			return true, "Command Injection"
 		}
 	}
+	return false, ""
+}
 
-	// Admin Panel Scanning - use more specific patterns to avoid false positives
-	// Check for actual admin paths, not just keywords in source code files
+func checkAdminScan(url, host string) (bool, string) {
 	urlLower := strings.ToLower(url)
-
-	// Exact path matches (start of path)
-	adminPaths := []string{"/admin", "/administrator", "/wp-admin", "/phpmyadmin",
-		"/cpanel", "/admin.php", "/adminpanel", "/backend", "/management"}
-	for _, path := range adminPaths {
-		// Check if URL starts with admin path or has it after domain
-		if strings.HasPrefix(urlLower, path) || strings.Contains(urlLower, "://"+c.Request.Host+path) {
-			return true, "Admin Scan"
-		}
-	}
-
-	// Common admin file patterns (avoid matching .tsx, .ts, .jsx, .js source files)
-	adminFilePatterns := []string{"/admin/login", "/admin/index", "/login.php", "/admin.asp"}
-	for _, pattern := range adminFilePatterns {
-		if strings.Contains(urlLower, pattern) {
-			return true, "Admin Scan"
-		}
-	}
 
 	// Exclude source code files from detection
 	sourceFileExtensions := []string{".tsx", ".ts", ".jsx", ".js", ".vue", ".py", ".go", ".java"}
 	for _, ext := range sourceFileExtensions {
 		if strings.HasSuffix(urlLower, ext) {
-			// Skip attack detection for source code files
-			break
+			return false, ""
 		}
 	}
 
-	// Bot Detection
+	// Exact path matches (start of path)
+	adminPaths := []string{"/admin", "/administrator", "/wp-admin", "/phpmyadmin",
+		"/cpanel", "/admin.php", "/adminpanel", "/backend", "/management"}
+	for _, path := range adminPaths {
+		if strings.HasPrefix(urlLower, path) || strings.Contains(urlLower, "://"+host+path) {
+			return true, attackTypeAdminScan
+		}
+	}
+
+	// Common admin file patterns
+	adminFilePatterns := []string{"/admin/login", "/admin/index", "/login.php", "/admin.asp"}
+	for _, pattern := range adminFilePatterns {
+		if strings.Contains(urlLower, pattern) {
+			return true, attackTypeAdminScan
+		}
+	}
+	return false, ""
+}
+
+func checkBot(userAgent string) (bool, string) {
 	botPatterns := []string{"bot", "crawler", "spider", "python", "curl", "wget"}
 	for _, pattern := range botPatterns {
 		if strings.Contains(strings.ToLower(userAgent), pattern) {
 			return true, "Bot Traffic"
 		}
 	}
-
 	return false, ""
 }
 
-func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
+func logTraffic(db *sqlx.DB, banService *services.DynamicBanService, notificationService *services.NotificationService, c *gin.Context, duration time.Duration) {
 	// Detect attack
-	isAttack, attackType := detectAttackType(c)
+	var isAttack bool
+	var attackType string
+
+	// First check if downstream middleware (like OWASP) detected an attack
+	if val, exists := c.Get("is_attack"); exists {
+		isAttack = val.(bool)
+	}
+	if val, exists := c.Get("attack_type"); exists {
+		attackType = val.(string)
+	}
+
+	// Fallback to internal detection if not already detected
+	if !isAttack {
+		isAttack, attackType = detectAttackType(c)
+	}
 	blocked := c.GetBool("blocked") || c.Writer.Status() == 403
+
+	// If blocked due to attack, record violation
+	if blocked && isAttack && banService != nil {
+		realClientIP := GetRealClientIP(c)
+		err := banService.RecordViolation(realClientIP, attackType)
+		if err != nil {
+			log.Printf("Failed to record violation for IP %s: %v", realClientIP, err)
+		}
+	}
 
 	query := `
 		INSERT INTO traffic_logs (
@@ -192,6 +249,9 @@ func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
 		if val, exists := c.Get("block_reason"); exists {
 			blockReason = val.(string)
 		}
+
+		// Notify on Critical/High attacks
+		notifyIfAttack(notificationService, c, isAttack, attackType, blockReason, db)
 	}
 
 	realClientIP := GetRealClientIP(c)
@@ -221,6 +281,32 @@ func logTraffic(db *sqlx.DB, c *gin.Context, duration time.Duration) {
 	if err != nil {
 		// Log error but don't fail the request
 		println("Failed to log traffic:", err.Error())
+	}
+}
+
+func notifyIfAttack(notificationService *services.NotificationService, c *gin.Context, isAttack bool, attackType, blockReason string, db *sqlx.DB) {
+	if isAttack && notificationService != nil {
+		// Get severity from context if available (set by OWASP middleware)
+		severity := "medium"
+		if val, exists := c.Get("attack_severity"); exists {
+			severity = val.(string)
+		}
+
+		if severity == "critical" || severity == "high" {
+			notificationService.Notify(services.NotificationEvent{
+				Type:      "attack_detected",
+				Title:     fmt.Sprintf("%s Detected", attackType),
+				Message:   fmt.Sprintf("Blocked %s attack from IP %s on %s", attackType, GetRealClientIP(c), c.Request.Host),
+				Severity:  severity,
+				Timestamp: time.Now(),
+				Metadata: map[string]interface{}{
+					"IP":     GetRealClientIP(c),
+					"URL":    c.Request.URL.String(),
+					"Host":   lookupVHostDomain(db, c.Request.Host),
+					"Reason": blockReason,
+				},
+			})
+		}
 	}
 }
 

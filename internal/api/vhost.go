@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aleh/docode-waf/internal/constants"
+	"github.com/aleh/docode-waf/internal/models"
 	"github.com/aleh/docode-waf/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -98,15 +101,18 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 
 	// Query custom locations for all vhosts
 	type CustomLocation struct {
-		VHostID          string  `db:"vhost_id"`
-		Path             string  `db:"path" json:"path"`
-		ProxyPass        *string `db:"proxy_pass" json:"proxy_pass"`
-		CustomConfig     *string `db:"custom_config" json:"config"`
-		WebSocketEnabled bool    `db:"websocket_enabled" json:"websocket_enabled"`
+		VHostID           string  `db:"vhost_id"`
+		Path              string  `db:"path" json:"path"`
+		ProxyPass         *string `db:"proxy_pass" json:"proxy_pass"`
+		CustomConfig      *string `db:"custom_config" json:"config"`
+		WebSocketEnabled  bool    `db:"websocket_enabled" json:"websocket_enabled"`
+		Backends          *string `db:"backends" json:"backends"`
+		LoadBalanceMethod *string `db:"load_balance_method" json:"load_balance_method"`
 	}
 	var allLocations []CustomLocation
 	locQuery := `
-		SELECT vhost_id::text, path, proxy_pass, custom_config, COALESCE(websocket_enabled, false) as websocket_enabled
+		SELECT vhost_id::text, path, proxy_pass, custom_config, COALESCE(websocket_enabled, false) as websocket_enabled,
+		       backends::text as backends, COALESCE(load_balance_method, 'round_robin') as load_balance_method
 		FROM vhost_locations
 		WHERE enabled = true
 		ORDER BY created_at ASC
@@ -119,11 +125,22 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 		if _, exists := locationMap[loc.VHostID]; !exists {
 			locationMap[loc.VHostID] = []map[string]interface{}{}
 		}
+		// Parse location backends
+		var locBackends []string
+		if loc.Backends != nil && *loc.Backends != "" && *loc.Backends != "[]" {
+			_ = json.Unmarshal([]byte(*loc.Backends), &locBackends)
+		}
+		if locBackends == nil {
+			locBackends = []string{}
+		}
+
 		locationMap[loc.VHostID] = append(locationMap[loc.VHostID], map[string]interface{}{
-			"path":              loc.Path,
-			"proxy_pass":        loc.ProxyPass,
-			"config":            loc.CustomConfig,
-			"websocket_enabled": loc.WebSocketEnabled,
+			"path":                loc.Path,
+			"proxy_pass":          loc.ProxyPass,
+			"config":              loc.CustomConfig,
+			"websocket_enabled":   loc.WebSocketEnabled,
+			"backends":            locBackends,
+			"load_balance_method": loc.LoadBalanceMethod,
 		})
 	}
 
@@ -135,16 +152,8 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 			customLocs = []map[string]interface{}{}
 		}
 
-		// Parse backends from JSON
-		var backends []string
-		if vhost.Backends != nil && *vhost.Backends != "" && *vhost.Backends != "[]" {
-			_ = json.Unmarshal([]byte(*vhost.Backends), &backends)
-		}
-		if backends == nil {
-			backends = []string{}
-		}
-
-		loadBalanceMethod := "round_robin"
+		backends := parseJSONStringArray(vhost.Backends)
+		loadBalanceMethod := constants.DefaultLoadBalanceMethod
 		if vhost.LoadBalanceMethod != nil {
 			loadBalanceMethod = *vhost.LoadBalanceMethod
 		}
@@ -193,36 +202,52 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 // GetVHost returns a specific virtual host
 func (h *VHostHandler) GetVHost(c *gin.Context) {
 	type VHost struct {
-		ID                  string          `db:"id" json:"id"`
-		Name                string          `db:"name" json:"name"`
-		Type                string          `db:"type" json:"type"`
-		Domain              string          `db:"domain" json:"domain"`
-		BackendURL          string          `db:"backend_url" json:"backend_url"`
-		SSLEnabled          bool            `db:"ssl_enabled" json:"ssl_enabled"`
-		SSLCertificateID    *string         `db:"ssl_certificate_id" json:"ssl_certificate_id"`
-		SSLCertPath         *string         `db:"ssl_cert_path" json:"ssl_cert_path"`
-		SSLKeyPath          *string         `db:"ssl_key_path" json:"ssl_key_path"`
-		Enabled             bool            `db:"enabled" json:"enabled"`
-		WebsocketEnabled    bool            `db:"websocket_enabled" json:"websocket_enabled"`
-		HTTPVersion         string          `db:"http_version" json:"http_version"`
-		TLSVersion          string          `db:"tls_version" json:"tls_version"`
-		MaxUploadSize       int             `db:"max_upload_size" json:"max_upload_size"`
-		ProxyReadTimeout    int             `db:"proxy_read_timeout" json:"proxy_read_timeout"`
-		ProxyConnectTimeout int             `db:"proxy_connect_timeout" json:"proxy_connect_timeout"`
-		CustomHeaders       json.RawMessage `db:"custom_headers" json:"custom_headers"`
-		CreatedAt           time.Time       `db:"created_at" json:"created_at"`
-		UpdatedAt           time.Time       `db:"updated_at" json:"updated_at"`
+		ID                     string          `db:"id" json:"id"`
+		Name                   string          `db:"name" json:"name"`
+		Type                   string          `db:"type" json:"type"`
+		Domain                 string          `db:"domain" json:"domain"`
+		BackendURL             string          `db:"backend_url" json:"backend_url"`
+		Backends               *string         `db:"backends" json:"backends"`
+		LoadBalanceMethod      *string         `db:"load_balance_method" json:"load_balance_method"`
+		CustomConfig           *string         `db:"custom_config" json:"custom_config"`
+		SSLEnabled             bool            `db:"ssl_enabled" json:"ssl_enabled"`
+		SSLCertificateID       *string         `db:"ssl_certificate_id" json:"ssl_certificate_id"`
+		SSLCertPath            *string         `db:"ssl_cert_path" json:"ssl_cert_path"`
+		SSLKeyPath             *string         `db:"ssl_key_path" json:"ssl_key_path"`
+		Enabled                bool            `db:"enabled" json:"enabled"`
+		WebsocketEnabled       bool            `db:"websocket_enabled" json:"websocket_enabled"`
+		HTTPVersion            string          `db:"http_version" json:"http_version"`
+		TLSVersion             string          `db:"tls_version" json:"tls_version"`
+		MaxUploadSize          int             `db:"max_upload_size" json:"max_upload_size"`
+		ProxyReadTimeout       int             `db:"proxy_read_timeout" json:"proxy_read_timeout"`
+		ProxyConnectTimeout    int             `db:"proxy_connect_timeout" json:"proxy_connect_timeout"`
+		BotDetectionEnabled    bool            `db:"bot_detection_enabled" json:"bot_detection_enabled"`
+		BotDetectionType       string          `db:"bot_detection_type" json:"bot_detection_type"`
+		RecaptchaVersion       string          `db:"recaptcha_version" json:"recaptcha_version"`
+		RateLimitEnabled       bool            `db:"rate_limit_enabled" json:"rate_limit_enabled"`
+		RateLimitRequests      int             `db:"rate_limit_requests" json:"rate_limit_requests"`
+		RateLimitWindow        int             `db:"rate_limit_window" json:"rate_limit_window"`
+		RegionFilteringEnabled bool            `db:"region_filtering_enabled" json:"region_filtering_enabled"`
+		RegionWhitelist        json.RawMessage `db:"region_whitelist" json:"region_whitelist"`
+		RegionBlacklist        json.RawMessage `db:"region_blacklist" json:"region_blacklist"`
+		CustomHeaders          json.RawMessage `db:"custom_headers" json:"custom_headers"`
+		CreatedAt              time.Time       `db:"created_at" json:"created_at"`
+		UpdatedAt              time.Time       `db:"updated_at" json:"updated_at"`
 	}
 
 	id := c.Param("id")
 
 	var vhost VHost
 	query := `
-		SELECT id::text, name, COALESCE(type, 'proxy') as type, domain, backend_url, ssl_enabled, 
-		       ssl_certificate_id::text, ssl_cert_path, ssl_key_path, enabled,
+		SELECT id::text, name, COALESCE(type, 'proxy') as type, domain, backend_url,
+		       backends::text as backends, COALESCE(load_balance_method, 'round_robin') as load_balance_method, custom_config,
+		       ssl_enabled, ssl_certificate_id::text, ssl_cert_path, ssl_key_path, enabled,
 		       websocket_enabled, http_version, tls_version, max_upload_size,
-		       proxy_read_timeout, proxy_connect_timeout, custom_headers,
-		       created_at, updated_at
+		       proxy_read_timeout, proxy_connect_timeout,
+		       bot_detection_enabled, bot_detection_type, recaptcha_version,
+		       rate_limit_enabled, rate_limit_requests, rate_limit_window,
+		       region_filtering_enabled, region_whitelist, region_blacklist,
+		       custom_headers, created_at, updated_at
 		FROM vhosts 
 		WHERE id = $1
 	`
@@ -233,43 +258,100 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 		return
 	}
 
+	// Parse fields
+	backends := parseJSONStringArray(vhost.Backends)
+	regionWhitelist := parseJSONRawMessage(vhost.RegionWhitelist)
+	regionBlacklist := parseJSONRawMessage(vhost.RegionBlacklist)
+
+	loadBalanceMethod := constants.DefaultLoadBalanceMethod
+	if vhost.LoadBalanceMethod != nil {
+		loadBalanceMethod = *vhost.LoadBalanceMethod
+	}
+
+	customConfig := ""
+	if vhost.CustomConfig != nil {
+		customConfig = *vhost.CustomConfig
+	}
+
 	// Query custom locations
 	type CustomLocation struct {
-		Path             string  `db:"path" json:"path"`
-		ProxyPass        *string `db:"proxy_pass" json:"proxy_pass"`
-		CustomConfig     *string `db:"custom_config" json:"config"`
-		WebSocketEnabled bool    `db:"websocket_enabled" json:"websocket_enabled"`
+		Path              string  `db:"path" json:"path"`
+		ProxyPass         *string `db:"proxy_pass" json:"proxy_pass"`
+		CustomConfig      *string `db:"custom_config" json:"config"`
+		WebSocketEnabled  bool    `db:"websocket_enabled" json:"websocket_enabled"`
+		Backends          *string `db:"backends" json:"backends"`
+		LoadBalanceMethod *string `db:"load_balance_method" json:"load_balance_method"`
 	}
-	var customLocations []CustomLocation
+	var dbCustomLocations []CustomLocation
 	locQuery := `
-		SELECT path, proxy_pass, custom_config, COALESCE(websocket_enabled, false) as websocket_enabled
+		SELECT path, proxy_pass, custom_config, COALESCE(websocket_enabled, false) as websocket_enabled,
+		       backends::text as backends, COALESCE(load_balance_method, 'round_robin') as load_balance_method
 		FROM vhost_locations
 		WHERE vhost_id = $1 AND enabled = true
 		ORDER BY created_at ASC
 	`
-	_ = h.db.Select(&customLocations, locQuery, id)
+	_ = h.db.Select(&dbCustomLocations, locQuery, id)
 
-	// Build response with custom_locations
+	// Process custom locations to parse JSON backends
+	var customLocations []map[string]interface{}
+	for _, loc := range dbCustomLocations {
+		var locBackends []string
+		if loc.Backends != nil && *loc.Backends != "" && *loc.Backends != "[]" {
+			_ = json.Unmarshal([]byte(*loc.Backends), &locBackends)
+		}
+		if locBackends == nil {
+			locBackends = []string{}
+		}
+
+		locLoadBalanceMethod := "round_robin"
+		if loc.LoadBalanceMethod != nil {
+			locLoadBalanceMethod = *loc.LoadBalanceMethod
+		}
+
+		customLocations = append(customLocations, map[string]interface{}{
+			"path":                loc.Path,
+			"proxy_pass":          loc.ProxyPass,
+			"config":              loc.CustomConfig,
+			"websocket_enabled":   loc.WebSocketEnabled,
+			"backends":            locBackends,
+			"load_balance_method": locLoadBalanceMethod,
+		})
+	}
+
+	// Build response with all fields
 	response := map[string]interface{}{
-		"id":                    vhost.ID,
-		"name":                  vhost.Name,
-		"domain":                vhost.Domain,
-		"backend_url":           vhost.BackendURL,
-		"ssl_enabled":           vhost.SSLEnabled,
-		"ssl_certificate_id":    vhost.SSLCertificateID,
-		"ssl_cert_path":         vhost.SSLCertPath,
-		"ssl_key_path":          vhost.SSLKeyPath,
-		"enabled":               vhost.Enabled,
-		"websocket_enabled":     vhost.WebsocketEnabled,
-		"http_version":          vhost.HTTPVersion,
-		"tls_version":           vhost.TLSVersion,
-		"max_upload_size":       vhost.MaxUploadSize,
-		"proxy_read_timeout":    vhost.ProxyReadTimeout,
-		"proxy_connect_timeout": vhost.ProxyConnectTimeout,
-		"custom_headers":        vhost.CustomHeaders,
-		"custom_locations":      customLocations,
-		"created_at":            vhost.CreatedAt,
-		"updated_at":            vhost.UpdatedAt,
+		"id":                       vhost.ID,
+		"name":                     vhost.Name,
+		"type":                     vhost.Type,
+		"domain":                   vhost.Domain,
+		"backend_url":              vhost.BackendURL,
+		"backends":                 backends,
+		"load_balance_method":      loadBalanceMethod,
+		"custom_config":            customConfig,
+		"ssl_enabled":              vhost.SSLEnabled,
+		"ssl_certificate_id":       vhost.SSLCertificateID,
+		"ssl_cert_path":            vhost.SSLCertPath,
+		"ssl_key_path":             vhost.SSLKeyPath,
+		"enabled":                  vhost.Enabled,
+		"websocket_enabled":        vhost.WebsocketEnabled,
+		"http_version":             vhost.HTTPVersion,
+		"tls_version":              vhost.TLSVersion,
+		"max_upload_size":          vhost.MaxUploadSize,
+		"proxy_read_timeout":       vhost.ProxyReadTimeout,
+		"proxy_connect_timeout":    vhost.ProxyConnectTimeout,
+		"bot_detection_enabled":    vhost.BotDetectionEnabled,
+		"bot_detection_type":       vhost.BotDetectionType,
+		"recaptcha_version":        vhost.RecaptchaVersion,
+		"rate_limit_enabled":       vhost.RateLimitEnabled,
+		"rate_limit_requests":      vhost.RateLimitRequests,
+		"rate_limit_window":        vhost.RateLimitWindow,
+		"region_filtering_enabled": vhost.RegionFilteringEnabled,
+		"region_whitelist":         regionWhitelist,
+		"region_blacklist":         regionBlacklist,
+		"custom_headers":           vhost.CustomHeaders,
+		"custom_locations":         customLocations,
+		"created_at":               vhost.CreatedAt,
+		"updated_at":               vhost.UpdatedAt,
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -277,68 +359,13 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 
 // CreateVHost creates a new virtual host
 func (h *VHostHandler) CreateVHost(c *gin.Context) {
-	var input struct {
-		Name                   string                   `json:"name" binding:"required"`
-		Type                   string                   `json:"type"`
-		Domain                 string                   `json:"domain" binding:"required"`
-		BackendURL             string                   `json:"backend_url" binding:"required"`
-		Backends               []string                 `json:"backends"`
-		LoadBalanceMethod      string                   `json:"load_balance_method"`
-		CustomConfig           string                   `json:"custom_config"`
-		SSLEnabled             bool                     `json:"ssl_enabled"`
-		SSLCertificateID       *string                  `json:"ssl_certificate_id"`
-		SSLCertPath            string                   `json:"ssl_cert_path"`
-		SSLKeyPath             string                   `json:"ssl_key_path"`
-		Enabled                bool                     `json:"enabled"`
-		WebsocketEnabled       bool                     `json:"websocket_enabled"`
-		HTTPVersion            string                   `json:"http_version"`
-		TLSVersion             string                   `json:"tls_version"`
-		MaxUploadSize          int                      `json:"max_upload_size"`
-		ProxyReadTimeout       int                      `json:"proxy_read_timeout"`
-		ProxyConnectTimeout    int                      `json:"proxy_connect_timeout"`
-		BotDetectionEnabled    bool                     `json:"bot_detection_enabled"`
-		BotDetectionType       string                   `json:"bot_detection_type"`
-		RecaptchaVersion       string                   `json:"recaptcha_version"`
-		RateLimitEnabled       bool                     `json:"rate_limit_enabled"`
-		RateLimitRequests      int                      `json:"rate_limit_requests"`
-		RateLimitWindow        int                      `json:"rate_limit_window"`
-		RegionWhitelist        []string                 `json:"region_whitelist"`
-		RegionBlacklist        []string                 `json:"region_blacklist"`
-		RegionFilteringEnabled bool                     `json:"region_filtering_enabled"`
-		CustomHeaders          map[string]interface{}   `json:"custom_headers"`
-		CustomLocations        []map[string]interface{} `json:"custom_locations"`
-	}
-
+	var input models.VHostInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Set defaults
-	if input.HTTPVersion == "" {
-		input.HTTPVersion = "http/1.1"
-	}
-	if input.ProxyReadTimeout == 0 {
-		input.ProxyReadTimeout = 60
-	}
-	if input.ProxyConnectTimeout == 0 {
-		input.ProxyConnectTimeout = 60
-	}
-	if input.BotDetectionType == "" {
-		input.BotDetectionType = "turnstile"
-	}
-	if input.RecaptchaVersion == "" {
-		input.RecaptchaVersion = "v2"
-	}
-	if input.RateLimitRequests == 0 {
-		input.RateLimitRequests = 100
-	}
-	if input.RateLimitWindow == 0 {
-		input.RateLimitWindow = 60
-	}
-	if input.CustomHeaders == nil {
-		input.CustomHeaders = make(map[string]interface{})
-	}
+	sanitizeVHostInput(&input)
 
 	// Marshal custom_headers to JSON
 	customHeadersJSON, err := json.Marshal(input.CustomHeaders)
@@ -348,28 +375,20 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	}
 
 	// Marshal backends to JSON
-	if input.Backends == nil {
-		input.Backends = []string{}
-	}
 	backendsJSON, err := json.Marshal(input.Backends)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid backends format"})
 		return
 	}
 
-	// Set default load balance method
-	if input.LoadBalanceMethod == "" {
-		input.LoadBalanceMethod = "round_robin"
-	}
-
-	// Set default type
-	if input.Type == "" {
-		input.Type = "proxy"
-	}
-
-	// Sanitize SSL Certificate ID
-	if input.SSLCertificateID != nil && *input.SSLCertificateID == "" {
-		input.SSLCertificateID = nil
+	// Validate SSL Certificate if provided
+	if input.SSLCertificateID != nil {
+		// Verify certificate exists
+		_, err := h.certService.GetCertificate(*input.SSLCertificateID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid SSL certificate ID"})
+			return
+		}
 	}
 
 	query := `
@@ -428,21 +447,37 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 	if len(input.CustomLocations) > 0 {
 		for _, loc := range input.CustomLocations {
 			locQuery := `
-				INSERT INTO vhost_locations (id, vhost_id, path, backend_url, proxy_pass, custom_config, websocket_enabled, enabled, created_at, updated_at)
-				VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, true, $7, $8)
+				INSERT INTO vhost_locations (id, vhost_id, path, backend_url, proxy_pass, custom_config, websocket_enabled, backends, load_balance_method, enabled, created_at, updated_at)
+				VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, true, $9, $10)
 			`
 			proxyPass := loc["proxy_pass"]
 			websocketEnabled := false
 			if wsEnabled, ok := loc["websocket_enabled"].(bool); ok {
 				websocketEnabled = wsEnabled
 			}
+
+			// Handle backends for location
+			var backendsJSON []byte = []byte("[]")
+			if backends, ok := loc["backends"].([]interface{}); ok {
+				if b, err := json.Marshal(backends); err == nil {
+					backendsJSON = b
+				}
+			}
+
+			loadBalanceMethod := "round_robin"
+			if method, ok := loc["load_balance_method"].(string); ok && method != "" {
+				loadBalanceMethod = method
+			}
+
 			_, err := h.db.Exec(locQuery,
 				id,
 				loc["path"],
-				proxyPass,        // backend_url (required NOT NULL)
-				proxyPass,        // proxy_pass
-				loc["config"],    // custom_config
-				websocketEnabled, // websocket_enabled
+				proxyPass,         // backend_url (required NOT NULL)
+				proxyPass,         // proxy_pass
+				loc["config"],     // custom_config
+				websocketEnabled,  // websocket_enabled
+				backendsJSON,      // backends
+				loadBalanceMethod, // load_balance_method
 				time.Now(),
 				time.Now(),
 			)
@@ -491,41 +526,23 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	id := c.Param("id")
 
-	var input struct {
-		Name                   string                   `json:"name"`
-		Type                   string                   `json:"type"`
-		Domain                 string                   `json:"domain"`
-		BackendURL             string                   `json:"backend_url"`
-		Backends               []string                 `json:"backends"`
-		LoadBalanceMethod      string                   `json:"load_balance_method"`
-		CustomConfig           string                   `json:"custom_config"`
-		SSLEnabled             bool                     `json:"ssl_enabled"`
-		SSLCertificateID       *string                  `json:"ssl_certificate_id"`
-		SSLCertPath            string                   `json:"ssl_cert_path"`
-		SSLKeyPath             string                   `json:"ssl_key_path"`
-		Enabled                bool                     `json:"enabled"`
-		WebsocketEnabled       bool                     `json:"websocket_enabled"`
-		HTTPVersion            string                   `json:"http_version"`
-		TLSVersion             string                   `json:"tls_version"`
-		MaxUploadSize          int                      `json:"max_upload_size"`
-		ProxyReadTimeout       int                      `json:"proxy_read_timeout"`
-		ProxyConnectTimeout    int                      `json:"proxy_connect_timeout"`
-		BotDetectionEnabled    bool                     `json:"bot_detection_enabled"`
-		BotDetectionType       string                   `json:"bot_detection_type"`
-		RecaptchaVersion       string                   `json:"recaptcha_version"`
-		RateLimitEnabled       bool                     `json:"rate_limit_enabled"`
-		RateLimitRequests      int                      `json:"rate_limit_requests"`
-		RateLimitWindow        int                      `json:"rate_limit_window"`
-		RegionWhitelist        []string                 `json:"region_whitelist"`
-		RegionBlacklist        []string                 `json:"region_blacklist"`
-		RegionFilteringEnabled bool                     `json:"region_filtering_enabled"`
-		CustomHeaders          map[string]interface{}   `json:"custom_headers"`
-		CustomLocations        []map[string]interface{} `json:"custom_locations"`
-	}
-
+	var input models.VHostInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	sanitizeVHostInput(&input)
+
+	// Validate SSL Certificate if provided
+	// Validate SSL Certificate if provided
+	if input.SSLCertificateID != nil {
+		// Verify certificate exists
+		_, err := h.certService.GetCertificate(*input.SSLCertificateID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid SSL certificate ID"})
+			return
+		}
 	}
 
 	query := `
@@ -540,34 +557,6 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		    custom_headers = $28, updated_at = $29
 		WHERE id = $30
 	`
-
-	// Set defaults
-	if input.HTTPVersion == "" {
-		input.HTTPVersion = "http/1.1"
-	}
-	if input.MaxUploadSize == 0 {
-		input.MaxUploadSize = 10
-	}
-	if input.ProxyReadTimeout == 0 {
-		input.ProxyReadTimeout = 60
-	}
-	if input.ProxyConnectTimeout == 0 {
-		input.ProxyConnectTimeout = 60
-	}
-	if input.CustomHeaders == nil {
-		input.CustomHeaders = make(map[string]interface{})
-	}
-	if input.Backends == nil {
-		input.Backends = []string{}
-	}
-
-	// Sanitize SSL Certificate ID
-	if input.SSLCertificateID != nil && *input.SSLCertificateID == "" {
-		input.SSLCertificateID = nil
-	}
-	if input.LoadBalanceMethod == "" {
-		input.LoadBalanceMethod = "round_robin"
-	}
 
 	// Marshal custom_headers to JSON
 	customHeadersJSON, err := json.Marshal(input.CustomHeaders)
@@ -634,21 +623,37 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	if len(input.CustomLocations) > 0 {
 		for _, loc := range input.CustomLocations {
 			locQuery := `
-				INSERT INTO vhost_locations (id, vhost_id, path, backend_url, proxy_pass, custom_config, websocket_enabled, enabled, created_at, updated_at)
-				VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, true, $7, $8)
+				INSERT INTO vhost_locations (id, vhost_id, path, backend_url, proxy_pass, custom_config, websocket_enabled, backends, load_balance_method, enabled, created_at, updated_at)
+				VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, true, $9, $10)
 			`
 			proxyPass := loc["proxy_pass"]
 			websocketEnabled := false
 			if wsEnabled, ok := loc["websocket_enabled"].(bool); ok {
 				websocketEnabled = wsEnabled
 			}
+
+			// Handle backends for location
+			var backendsJSON []byte = []byte("[]")
+			if backends, ok := loc["backends"].([]interface{}); ok {
+				if b, err := json.Marshal(backends); err == nil {
+					backendsJSON = b
+				}
+			}
+
+			loadBalanceMethod := "round_robin"
+			if method, ok := loc["load_balance_method"].(string); ok && method != "" {
+				loadBalanceMethod = method
+			}
+
 			_, err := h.db.Exec(locQuery,
 				id,
 				loc["path"],
-				proxyPass,        // backend_url (required NOT NULL)
-				proxyPass,        // proxy_pass
-				loc["config"],    // custom_config
-				websocketEnabled, // websocket_enabled
+				proxyPass,         // backend_url (required NOT NULL)
+				proxyPass,         // proxy_pass
+				loc["config"],     // custom_config
+				websocketEnabled,  // websocket_enabled
+				backendsJSON,      // backends
+				loadBalanceMethod, // load_balance_method
 				time.Now(),
 				time.Now(),
 			)
@@ -692,6 +697,114 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "VHost updated successfully"})
+}
+
+// PreviewVHostConfig generates a preview of the nginx configuration without saving
+func (h *VHostHandler) PreviewVHostConfig(c *gin.Context) {
+	var input models.VHostInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	sanitizeVHostInput(&input)
+
+	// Construct VHostWithLocations for preview
+	// Note: We are using services.VHostWithLocations struct structure manually
+	// because we don't have a direct model -> VHostWithLocations converter that accepts input struct directly
+
+	// First, map input to VHost model
+	vhost := &services.VHostWithLocations{
+		VHost: &models.VHost{
+			Name:                   input.Name,
+			Type:                   input.Type,
+			Domain:                 input.Domain,
+			BackendURL:             input.BackendURL,
+			Backends:               input.Backends,
+			LoadBalanceMethod:      input.LoadBalanceMethod,
+			CustomConfig:           input.CustomConfig,
+			SSLEnabled:             input.SSLEnabled,
+			SSLCertificateID:       "", // Not needed for preview usually
+			Enabled:                input.Enabled,
+			RegionWhitelist:        input.RegionWhitelist,
+			RegionBlacklist:        input.RegionBlacklist,
+			RegionFilteringEnabled: input.RegionFilteringEnabled,
+		},
+		CustomLocations: []services.CustomLocation{},
+	}
+
+	if input.SSLCertificateID != nil {
+		vhost.SSLCertificateID = *input.SSLCertificateID
+	}
+
+	// Helper to sanitize upstream name
+	sanitize := func(s string) string {
+		re := regexp.MustCompile(`[^a-zA-Z0-9]`)
+		return re.ReplaceAllString(s, "_")
+	}
+
+	// Determine upstream name
+	upstreamName := sanitize(input.Domain)
+	vhost.UpstreamName = upstreamName
+
+	// If there are additional backends, prepend backend_url to form the full upstream
+	allBackends := input.Backends
+	if len(allBackends) > 0 && input.BackendURL != "" {
+		allBackends = append([]string{input.BackendURL}, allBackends...)
+	}
+	if len(allBackends) > 0 {
+		vhost.HasUpstream = true
+		vhost.Backends = allBackends
+	}
+
+	// Process Custom Locations
+	for _, loc := range input.CustomLocations {
+		path, _ := loc["path"].(string)
+		proxyPass, _ := loc["proxy_pass"].(string)
+		config, _ := loc["config"].(string)
+		wsEnabled, _ := loc["websocket_enabled"].(bool)
+
+		customLoc := services.CustomLocation{
+			Path:             path,
+			ProxyPass:        proxyPass,
+			CustomConfig:     config,
+			WebSocketEnabled: wsEnabled,
+		}
+
+		// Handle backends for location
+		if backends, ok := loc["backends"].([]interface{}); ok {
+			var locBackends []string
+			// Convert []interface{} to []string
+			for _, b := range backends {
+				if s, ok := b.(string); ok {
+					locBackends = append(locBackends, s)
+				}
+			}
+
+			if len(locBackends) > 0 {
+				customLoc.Backends = locBackends
+				customLoc.HasUpstream = true
+				// sanitize path: remove leading slash first
+				cleanPath := strings.TrimPrefix(path, "/")
+				customLoc.UpstreamName = upstreamName + "_loc_" + sanitize(cleanPath)
+			}
+		}
+
+		if method, ok := loc["load_balance_method"].(string); ok && method != "" {
+			customLoc.LoadBalanceMethod = method
+		}
+
+		vhost.CustomLocations = append(vhost.CustomLocations, customLoc)
+	}
+
+	// Generate config
+	configContent, err := h.nginxConfigService.GenerateVHostConfigContent(vhost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate config preview: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"config": configContent})
 }
 
 // DeleteVHost deletes a virtual host
