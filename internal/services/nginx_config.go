@@ -43,6 +43,15 @@ func sanitizePath(path string) string {
 	return re.ReplaceAllString(path, "_")
 }
 
+// stripProtocol removes http://, https:// and trailing slashes from a URL
+// for use in nginx upstream server directives
+func stripProtocol(url string) string {
+	url = strings.TrimPrefix(url, "http://")
+	url = strings.TrimPrefix(url, "https://")
+	url = strings.TrimSuffix(url, "/")
+	return url
+}
+
 // parseJSONBackends parses JSON array of backend URLs
 func parseJSONBackends(jsonStr string, backends *[]string) error {
 	return json.Unmarshal([]byte(jsonStr), backends)
@@ -321,9 +330,12 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 	// Prepare vhost with locations
 	upstreamName := sanitizeDomainForUpstream(vhost.Domain)
 	// If there are additional backends, prepend backend_url to form the full upstream
-	allBackends := vhost.Backends
+	allBackends := []string{}
+	for _, b := range vhost.Backends {
+		allBackends = append(allBackends, stripProtocol(b))
+	}
 	if len(allBackends) > 0 && vhost.BackendURL != "" {
-		allBackends = append([]string{vhost.BackendURL}, allBackends...)
+		allBackends = append([]string{stripProtocol(vhost.BackendURL)}, allBackends...)
 	}
 
 	vhostWithLocs := &VHostWithLocations{
@@ -370,7 +382,12 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 				if loc.Backends != nil && *loc.Backends != "" && *loc.Backends != "[]" {
 					var backends []string
 					if err := parseJSONBackends(*loc.Backends, &backends); err == nil && len(backends) > 0 {
-						customLoc.Backends = backends
+						// Strip protocol from each backend
+						strippedBackends := make([]string, 0, len(backends))
+						for _, b := range backends {
+							strippedBackends = append(strippedBackends, stripProtocol(b))
+						}
+						customLoc.Backends = strippedBackends
 						customLoc.HasUpstream = true
 						customLoc.UpstreamName = upstreamName + "_loc_" + sanitizePath(loc.Path)
 					}
