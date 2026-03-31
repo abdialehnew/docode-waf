@@ -566,6 +566,10 @@ func OWASPProtectionMiddleware(db *sqlx.DB) gin.HandlerFunc {
 			c.Set("attack_type", result.AttackType)
 			c.Set("attack_severity", result.Severity)
 
+			if c.GetString("defense_mode") == "audited" {
+				shouldBlock = false
+			}
+
 			if shouldBlock {
 				c.Set("blocked", true)
 				c.Set("block_reason", "OWASP: "+result.AttackType)

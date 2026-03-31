@@ -38,6 +38,9 @@ func sanitizeVHostInput(input *models.VHostInput) {
 	if input.Type == "" {
 		input.Type = "proxy"
 	}
+	if input.DefenseMode == "" {
+		input.DefenseMode = "defense"
+	}
 	if input.BotDetectionType == "" {
 		input.BotDetectionType = "turnstile"
 	}

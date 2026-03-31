@@ -38,6 +38,7 @@ type VHost struct {
 	RegionWhitelist        []string  `json:"region_whitelist" db:"region_whitelist"`
 	RegionBlacklist        []string  `json:"region_blacklist" db:"region_blacklist"`
 	RegionFilteringEnabled bool      `json:"region_filtering_enabled" db:"region_filtering_enabled"`
+	DefenseMode            string    `json:"defense_mode" db:"defense_mode"`
 	CreatedAt              time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at" db:"updated_at"`
 }

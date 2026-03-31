@@ -28,6 +28,7 @@ type VHostInput struct {
 	RegionWhitelist        []string                 `json:"region_whitelist"`
 	RegionBlacklist        []string                 `json:"region_blacklist"`
 	RegionFilteringEnabled bool                     `json:"region_filtering_enabled"`
+	DefenseMode            string                   `json:"defense_mode"`
 	CustomHeaders          map[string]interface{}   `json:"custom_headers"`
 	CustomLocations        []map[string]interface{} `json:"custom_locations"`
 }

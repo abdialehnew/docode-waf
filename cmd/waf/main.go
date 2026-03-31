@@ -112,6 +112,7 @@ func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, 
 	ruleExecutor := middleware.NewRuleExecutor(ruleService)
 
 	// Apply WAF middleware
+	wafRouter.Use(middleware.DefenseModeMiddleware(db))                                     // Evaluate Defense/Audited/Offline mode
 	wafRouter.Use(ruleExecutor.Execute())                                                   // Custom visual rules first
 	wafRouter.Use(middleware.DynamicBanMiddleware(dynamicBanService))                       // Check for dynamic bans first
 	wafRouter.Use(middleware.LoggingMiddleware(db, dynamicBanService, notificationService)) // Log traffic and count violations (must be before blocking middleware)

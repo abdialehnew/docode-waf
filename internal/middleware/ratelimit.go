@@ -42,6 +42,22 @@ func RateLimiterMiddleware(redisClient *redis.Client, db *sqlx.DB) gin.HandlerFu
 			return
 		}
 
+		defenseMode := c.GetString("defense_mode")
+		if defenseMode == "audited" {
+			// Audited mode bypasses rate limiter
+			c.Next()
+			return
+		}
+
+		limitRequests := vhostSettings.RateLimitRequests
+		if defenseMode == "defense" {
+			// Tighten limiter for defense mode (cut requests by half)
+			limitRequests = limitRequests / 2
+			if limitRequests < 1 {
+				limitRequests = 1
+			}
+		}
+
 		clientIP := GetRealClientIP(c)
 		key := fmt.Sprintf("ratelimit:%s:%s", domain, clientIP)
 		ctx := context.Background()
@@ -54,19 +70,21 @@ func RateLimiterMiddleware(redisClient *redis.Client, db *sqlx.DB) gin.HandlerFu
 		}
 
 		// Check if limit exceeded
-		if count >= vhostSettings.RateLimitRequests {
+		if count >= limitRequests {
 			// Get TTL for reset time
 			ttl, _ := redisClient.TTL(ctx, key).Result()
 			resetTime := time.Now().Add(ttl).Unix()
 
 			// Set headers
-			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", vhostSettings.RateLimitRequests))
+			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", limitRequests))
 			c.Header("X-RateLimit-Remaining", "0")
 			c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", resetTime))
 			c.Header("Retry-After", fmt.Sprintf("%d", int(ttl.Seconds())))
 			c.Header("Content-Type", "text/html; charset=utf-8")
 
-			c.String(http.StatusTooManyRequests, getRateLimitHTML(domain, vhostSettings.RateLimitRequests, vhostSettings.RateLimitWindow, int(ttl.Seconds())))
+			c.String(http.StatusTooManyRequests, getRateLimitHTML(domain, limitRequests, vhostSettings.RateLimitWindow, int(ttl.Seconds())))
+			c.Abort()
+			return
 		}
 
 		// Increment counter
@@ -80,8 +98,8 @@ func RateLimiterMiddleware(redisClient *redis.Client, db *sqlx.DB) gin.HandlerFu
 		}
 
 		// Add rate limit headers
-		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", vhostSettings.RateLimitRequests))
-		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", vhostSettings.RateLimitRequests-count-1))
+		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", limitRequests))
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", limitRequests-count-1))
 		c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Duration(vhostSettings.RateLimitWindow)*time.Second).Unix()))
 
 		c.Next()

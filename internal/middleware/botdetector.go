@@ -54,6 +54,12 @@ func BotDetectorMiddleware(db *sqlx.DB) gin.HandlerFunc {
 			return
 		}
 
+		if c.GetString("defense_mode") == "audited" {
+			// Audited mode bypasses proactive bot challenges
+			c.Next()
+			return
+		}
+
 		// Check if user has already passed bot detection (cookie/session)
 		if passed, _ := c.Cookie("bot_check_passed_" + domain); passed == "true" {
 			c.Next()

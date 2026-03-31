@@ -73,6 +73,7 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 		RateLimitEnabled    bool            `db:"rate_limit_enabled" json:"rate_limit_enabled"`
 		RateLimitRequests   int             `db:"rate_limit_requests" json:"rate_limit_requests"`
 		RateLimitWindow     int             `db:"rate_limit_window" json:"rate_limit_window"`
+		DefenseMode         string          `db:"defense_mode" json:"defense_mode"`
 		CustomHeaders       json.RawMessage `db:"custom_headers" json:"custom_headers"`
 		CreatedAt           time.Time       `db:"created_at" json:"created_at"`
 		UpdatedAt           time.Time       `db:"updated_at" json:"updated_at"`
@@ -88,7 +89,7 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 		       proxy_read_timeout, proxy_connect_timeout,
 		       bot_detection_enabled, bot_detection_type, recaptcha_version,
 		       rate_limit_enabled, rate_limit_requests, rate_limit_window,
-		       custom_headers, created_at, updated_at
+		       COALESCE(defense_mode, 'defense') as defense_mode, custom_headers, created_at, updated_at
 		FROM vhosts 
 		ORDER BY created_at DESC
 	`
@@ -189,6 +190,7 @@ func (h *VHostHandler) ListVHosts(c *gin.Context) {
 			"rate_limit_enabled":    vhost.RateLimitEnabled,
 			"rate_limit_requests":   vhost.RateLimitRequests,
 			"rate_limit_window":     vhost.RateLimitWindow,
+			"defense_mode":          vhost.DefenseMode,
 			"custom_headers":        vhost.CustomHeaders,
 			"custom_locations":      customLocs,
 			"created_at":            vhost.CreatedAt,
@@ -230,6 +232,7 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 		RegionFilteringEnabled bool            `db:"region_filtering_enabled" json:"region_filtering_enabled"`
 		RegionWhitelist        json.RawMessage `db:"region_whitelist" json:"region_whitelist"`
 		RegionBlacklist        json.RawMessage `db:"region_blacklist" json:"region_blacklist"`
+		DefenseMode            string          `db:"defense_mode" json:"defense_mode"`
 		CustomHeaders          json.RawMessage `db:"custom_headers" json:"custom_headers"`
 		CreatedAt              time.Time       `db:"created_at" json:"created_at"`
 		UpdatedAt              time.Time       `db:"updated_at" json:"updated_at"`
@@ -247,7 +250,7 @@ func (h *VHostHandler) GetVHost(c *gin.Context) {
 		       bot_detection_enabled, bot_detection_type, recaptcha_version,
 		       rate_limit_enabled, rate_limit_requests, rate_limit_window,
 		       region_filtering_enabled, region_whitelist, region_blacklist,
-		       custom_headers, created_at, updated_at
+		       COALESCE(defense_mode, 'defense') as defense_mode, custom_headers, created_at, updated_at
 		FROM vhosts 
 		WHERE id = $1
 	`
@@ -399,8 +402,8 @@ func (h *VHostHandler) CreateVHost(c *gin.Context) {
 		                   bot_detection_enabled, bot_detection_type, recaptcha_version,
 		                   rate_limit_enabled, rate_limit_requests, rate_limit_window,
 		                   region_whitelist, region_blacklist, region_filtering_enabled,
-		                   custom_headers, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
+		                   defense_mode, custom_headers, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
 		RETURNING id
 	`
 
@@ -554,8 +557,8 @@ func (h *VHostHandler) UpdateVHost(c *gin.Context) {
 		    bot_detection_enabled = $19, bot_detection_type = $20, recaptcha_version = $21,
 		    rate_limit_enabled = $22, rate_limit_requests = $23, rate_limit_window = $24,
 		    region_whitelist = $25, region_blacklist = $26, region_filtering_enabled = $27,
-		    custom_headers = $28, updated_at = $29
-		WHERE id = $30
+		    defense_mode = $28, custom_headers = $29, updated_at = $30
+		WHERE id = $31
 	`
 
 	// Marshal custom_headers to JSON
@@ -729,6 +732,7 @@ func (h *VHostHandler) PreviewVHostConfig(c *gin.Context) {
 			RegionWhitelist:        input.RegionWhitelist,
 			RegionBlacklist:        input.RegionBlacklist,
 			RegionFilteringEnabled: input.RegionFilteringEnabled,
+			DefenseMode:            input.DefenseMode,
 		},
 		CustomLocations: []services.CustomLocation{},
 	}
