@@ -6,7 +6,9 @@ import {
     Pencil,
     CheckCircle,
     XCircle,
-    Send
+    Send,
+    MessageCircle,
+    SendHorizonal
 } from 'lucide-react'
 import Swal from 'sweetalert2'
 
@@ -20,7 +22,15 @@ const NotificationSettings = () => {
     const [formData, setFormData] = useState({
         name: '',
         type: 'slack',
-        config: { webhook_url: '', email_address: '' },
+        config: { 
+            webhook_url: '', 
+            email_address: '', 
+            bot_token: '', 
+            chat_id: '',
+            api_url: '',
+            api_token: '',
+            phone_number: ''
+        },
         events: ['attack_detected', 'ip_banned'],
         enabled: true
     })
@@ -177,7 +187,15 @@ const NotificationSettings = () => {
         setFormData({
             name: '',
             type: 'slack',
-            config: { webhook_url: '', email_address: '' },
+            config: { 
+                webhook_url: '', 
+                email_address: '', 
+                bot_token: '', 
+                chat_id: '',
+                api_url: '',
+                api_token: '',
+                phone_number: ''
+            },
             events: ['attack_detected', 'ip_banned'],
             enabled: true
         })
@@ -258,9 +276,13 @@ const NotificationSettings = () => {
                                     <div className={`p-2 rounded-lg ${channel.type === 'slack' ? 'bg-purple-100 text-purple-600' :
                                         channel.type === 'discord' ? 'bg-indigo-100 text-indigo-600' :
                                             channel.type === 'email' ? 'bg-blue-100 text-blue-600' :
-                                                'bg-gray-100 text-gray-600'
+                                                channel.type === 'telegram' ? 'bg-sky-100 text-sky-600' :
+                                                    channel.type === 'whatsapp' ? 'bg-green-100 text-green-600' :
+                                                        'bg-gray-100 text-gray-600'
                                         }`}>
-                                        <Bell className="h-6 w-6" />
+                                        {channel.type === 'telegram' ? <SendHorizonal className="h-6 w-6" /> :
+                                            channel.type === 'whatsapp' ? <MessageCircle className="h-6 w-6" /> :
+                                                <Bell className="h-6 w-6" />}
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-gray-900">{channel.name}</h3>
@@ -278,9 +300,10 @@ const NotificationSettings = () => {
                                 <div className="text-sm">
                                     <span className="text-gray-500 block text-xs">Destination:</span>
                                     <span className="font-mono text-xs bg-gray-50 px-2 py-1 rounded block truncate mt-1">
-                                        {channel.type === 'email'
-                                            ? channel.config.email_address
-                                            : channel.config.webhook_url}
+                                        {channel.type === 'email' ? channel.config.email_address :
+                                            channel.type === 'telegram' ? `Chat: ${channel.config.chat_id}` :
+                                                channel.type === 'whatsapp' ? `To: ${channel.config.phone_number}` :
+                                                    channel.config.webhook_url}
                                     </span>
                                 </div>
                                 <div>
@@ -352,6 +375,8 @@ const NotificationSettings = () => {
                                 >
                                     <option value="slack">Slack</option>
                                     <option value="discord">Discord</option>
+                                    <option value="telegram">Telegram Bot</option>
+                                    <option value="whatsapp">WhatsApp API</option>
                                     <option value="email">Email</option>
                                     <option value="webhook">Generic Webhook</option>
                                 </select>
@@ -372,6 +397,81 @@ const NotificationSettings = () => {
                                         required
                                     />
                                 </div>
+                            ) : formData.type === 'telegram' ? (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Bot Token</label>
+                                        <input
+                                            type="password"
+                                            value={formData.config.bot_token || ''}
+                                            onChange={e => setFormData({
+                                                ...formData,
+                                                config: { ...formData.config, bot_token: e.target.value }
+                                            })}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                            placeholder="123456789:ABCDefgh..."
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Chat ID</label>
+                                        <input
+                                            type="text"
+                                            value={formData.config.chat_id || ''}
+                                            onChange={e => setFormData({
+                                                ...formData,
+                                                config: { ...formData.config, chat_id: e.target.value }
+                                            })}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                            placeholder="-100123456789"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            ) : formData.type === 'whatsapp' ? (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">API Gateway URL</label>
+                                        <input
+                                            type="url"
+                                            value={formData.config.api_url || ''}
+                                            onChange={e => setFormData({
+                                                ...formData,
+                                                config: { ...formData.config, api_url: e.target.value }
+                                            })}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                            placeholder="https://api.ultramsg.com/instanceXXX/messages/chat"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">API Token / Instance Key</label>
+                                        <input
+                                            type="password"
+                                            value={formData.config.api_token || ''}
+                                            onChange={e => setFormData({
+                                                ...formData,
+                                                config: { ...formData.config, api_token: e.target.value }
+                                            })}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Target Phone Number</label>
+                                        <input
+                                            type="text"
+                                            value={formData.config.phone_number || ''}
+                                            onChange={e => setFormData({
+                                                ...formData,
+                                                config: { ...formData.config, phone_number: e.target.value }
+                                            })}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                            placeholder="62812345678"
+                                            required
+                                        />
+                                    </div>
+                                </div>
                             ) : (
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Webhook URL</label>
@@ -383,7 +483,7 @@ const NotificationSettings = () => {
                                             config: { ...formData.config, webhook_url: e.target.value }
                                         })}
                                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                        placeholder="https://hooks.slack.com/services/..."
+                                        placeholder={formData.type === 'slack' ? 'https://hooks.slack.com/services/...' : 'https://discord.com/api/webhooks/...'}
                                         required
                                     />
                                 </div>

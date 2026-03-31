@@ -339,9 +339,11 @@ func DetectOWASPAttack(url, body, userAgent string, headers map[string]string) *
 	initOWASPRuleset()
 
 	// Combine all input for scanning
+	// We only include header values (not keys) to prevent legitimate header names
+	// from triggering false positives (e.g., "Host:", "Content-Length:")
 	input := strings.ToLower(url + " " + body + " " + userAgent)
-	for k, v := range headers {
-		input += " " + k + ": " + v
+	for _, v := range headers {
+		input += " " + v
 	}
 
 	// Check Log4Shell first (Critical)
@@ -524,7 +526,14 @@ func OWASPProtectionMiddleware(db *sqlx.DB) gin.HandlerFunc {
 		headers := make(map[string]string)
 		for k, v := range c.Request.Header {
 			if len(v) > 0 {
-				headers[k] = v[0]
+				val := v[0]
+				// Sanitize Origin and Referer to prevent false positive SSRF triggers
+				// when WAF is accessed via private IP or localhost
+				if k == "Origin" || k == "Referer" {
+					val = strings.Replace(val, "http://", "", 1)
+					val = strings.Replace(val, "https://", "", 1)
+				}
+				headers[k] = val
 			}
 		}
 

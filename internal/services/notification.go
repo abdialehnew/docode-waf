@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -94,6 +95,10 @@ func (s *NotificationService) SendToChannel(channel *NotificationChannel, event 
 		return s.sendToSlack(config["webhook_url"], event)
 	case "discord":
 		return s.sendToDiscord(config["webhook_url"], event)
+	case "telegram":
+		return s.sendToTelegram(config["bot_token"], config["chat_id"], event)
+	case "whatsapp":
+		return s.sendToWhatsApp(config["api_url"], config["api_token"], config["phone_number"], event)
 	case "webhook":
 		return s.sendToWebhook(config["webhook_url"], event)
 	case "email":
@@ -177,6 +182,67 @@ func (s *NotificationService) sendToDiscord(url string, event NotificationEvent)
 	}
 
 	return postJSON(url, payload)
+}
+
+func (s *NotificationService) sendToTelegram(token, chatID string, event NotificationEvent) error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", token)
+
+	severityEmoji := "ℹ️"
+	if event.Severity == "critical" || event.Severity == "high" {
+		severityEmoji = "🚨"
+	} else if event.Severity == "medium" {
+		severityEmoji = "⚠️"
+	}
+
+	text := fmt.Sprintf("<b>%s %s</b>\n\n", severityEmoji, event.Title)
+	text += fmt.Sprintf("<b>Message:</b> %s\n", event.Message)
+	text += fmt.Sprintf("<b>Severity:</b> %s\n", strings.ToUpper(event.Severity))
+	text += fmt.Sprintf("<b>Type:</b> %s\n\n", event.Type)
+
+	if len(event.Metadata) > 0 {
+		text += "<b>Details:</b>\n"
+		for k, v := range event.Metadata {
+			text += fmt.Sprintf("• %s: <code>%v</code>\n", k, v)
+		}
+	}
+
+	text += fmt.Sprintf("\n<i>Time: %s</i>", event.Timestamp.Format(time.RFC1123))
+
+	payload := map[string]interface{}{
+		"chat_id":    chatID,
+		"text":       text,
+		"parse_mode": "HTML",
+	}
+
+	return postJSON(url, payload)
+}
+
+func (s *NotificationService) sendToWhatsApp(apiUrl, token, phone string, event NotificationEvent) error {
+	// Generic WhatsApp Gateway implementation (e.g. Ultramsg, Fonnte, etc.)
+	severityPrefix := "[INFO]"
+	if event.Severity == "critical" || event.Severity == "high" {
+		severityPrefix = "[ALERT]"
+	} else if event.Severity == "medium" {
+		severityPrefix = "[WARNING]"
+	}
+
+	body := fmt.Sprintf("*%s %s*\n\n", severityPrefix, event.Title)
+	body += fmt.Sprintf("%s\n\n", event.Message)
+	body += fmt.Sprintf("*Severity:* %s\n", event.Severity)
+
+	for k, v := range event.Metadata {
+		body += fmt.Sprintf("*%s:* %v\n", k, v)
+	}
+
+	body += fmt.Sprintf("\n_Time: %s_", event.Timestamp.Format(time.RFC1123))
+
+	payload := map[string]interface{}{
+		"token": token,
+		"to":    phone,
+		"body":  body,
+	}
+
+	return postJSON(apiUrl, payload)
 }
 
 func (s *NotificationService) sendToWebhook(url string, event NotificationEvent) error {
