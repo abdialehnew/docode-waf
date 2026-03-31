@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
     Bell,
     Plus,
@@ -12,6 +12,28 @@ import {
 } from 'lucide-react'
 import Swal from 'sweetalert2'
 
+// Available event types
+const EVENT_TYPES = [
+    { id: 'attack_detected', label: 'Attack Detected (High/Critical)' },
+    { id: 'ip_banned', label: 'IP Banned' },
+]
+
+const INITIAL_FORM_STATE = {
+    name: '',
+    type: 'slack',
+    config: { 
+        webhook_url: '', 
+        email_address: '', 
+        bot_token: '', 
+        chat_id: '',
+        api_url: '',
+        api_token: '',
+        phone_number: ''
+    },
+    events: ['attack_detected', 'ip_banned'],
+    enabled: true
+}
+
 const NotificationSettings = () => {
     const [channels, setChannels] = useState([])
     const [loading, setLoading] = useState(true)
@@ -19,34 +41,9 @@ const NotificationSettings = () => {
     const [editingChannel, setEditingChannel] = useState(null)
 
     // Form State
-    const [formData, setFormData] = useState({
-        name: '',
-        type: 'slack',
-        config: { 
-            webhook_url: '', 
-            email_address: '', 
-            bot_token: '', 
-            chat_id: '',
-            api_url: '',
-            api_token: '',
-            phone_number: ''
-        },
-        events: ['attack_detected', 'ip_banned'],
-        enabled: true
-    })
+    const [formData, setFormData] = useState(INITIAL_FORM_STATE)
 
-    // Available event types
-    const eventTypes = [
-        { id: 'attack_detected', label: 'Attack Detected (High/Critical)' },
-        { id: 'ip_banned', label: 'IP Banned' },
-        // { id: 'admin_login', label: 'Admin Login' } // Future
-    ]
-
-    useEffect(() => {
-        fetchChannels()
-    }, [])
-
-    const fetchChannels = async () => {
+    const fetchChannels = useCallback(async () => {
         try {
             const token = localStorage.getItem('token')
             const response = await fetch('/api/v1/notifications/channels', {
@@ -61,7 +58,11 @@ const NotificationSettings = () => {
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
+
+    useEffect(() => {
+        fetchChannels()
+    }, [fetchChannels])
 
     const handleDelete = async (id) => {
         const result = await Swal.fire({
@@ -184,21 +185,7 @@ const NotificationSettings = () => {
 
     const resetForm = () => {
         setEditingChannel(null)
-        setFormData({
-            name: '',
-            type: 'slack',
-            config: { 
-                webhook_url: '', 
-                email_address: '', 
-                bot_token: '', 
-                chat_id: '',
-                api_url: '',
-                api_token: '',
-                phone_number: ''
-            },
-            events: ['attack_detected', 'ip_banned'],
-            enabled: true
-        })
+        setFormData(INITIAL_FORM_STATE)
     }
 
     const openEditModal = (channel) => {
@@ -234,6 +221,255 @@ const NotificationSettings = () => {
         })
     }
 
+    // --- HELPER FUNCTIONS FOR RENDERING ---
+    const getChannelStyles = (type) => {
+        const styles = {
+            slack: 'bg-purple-100 text-purple-600',
+            discord: 'bg-indigo-100 text-indigo-600',
+            email: 'bg-blue-100 text-blue-600',
+            telegram: 'bg-sky-100 text-sky-600',
+            whatsapp: 'bg-green-100 text-green-600',
+        }
+        return styles[type] || 'bg-gray-100 text-gray-600'
+    }
+
+    const getChannelIcon = (type) => {
+        switch (type) {
+            case 'telegram': return <SendHorizonal className="h-6 w-6" />
+            case 'whatsapp': return <MessageCircle className="h-6 w-6" />
+            default: return <Bell className="h-6 w-6" />
+        }
+    }
+
+    const getChannelDestination = (channel) => {
+        if (!channel.config) return 'Not configured'
+        
+        switch (channel.type) {
+            case 'email': return channel.config.email_address || 'No email'
+            case 'telegram': return `Chat: ${channel.config.chat_id || 'Not set'}`
+            case 'whatsapp': return `To: ${channel.config.phone_number || 'Not set'}`
+            default: return channel.config.webhook_url || 'No URL'
+        }
+    }
+
+    const renderConfigFields = () => {
+        switch (formData.type) {
+            case 'email':
+                return (
+                    <div>
+                        <label htmlFor="emailAddress" className="block text-sm font-medium text-gray-700">Email Address</label>
+                        <input
+                            id="emailAddress"
+                            type="email"
+                            value={formData.config.email_address || ''}
+                            onChange={e => setFormData({
+                                ...formData,
+                                config: { ...formData.config, email_address: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                            required
+                        />
+                    </div>
+                )
+            case 'telegram':
+                return (
+                    <div className="space-y-3">
+                        <div>
+                            <label htmlFor="botToken" className="block text-sm font-medium text-gray-700">Bot Token</label>
+                            <input
+                                id="botToken"
+                                type="password"
+                                value={formData.config.bot_token || ''}
+                                onChange={e => setFormData({
+                                    ...formData,
+                                    config: { ...formData.config, bot_token: e.target.value }
+                                })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                placeholder="123456789:ABCDefgh..."
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="chatId" className="block text-sm font-medium text-gray-700">Chat ID</label>
+                            <input
+                                id="chatId"
+                                type="text"
+                                value={formData.config.chat_id || ''}
+                                onChange={e => setFormData({
+                                    ...formData,
+                                    config: { ...formData.config, chat_id: e.target.value }
+                                })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                placeholder="-100123456789"
+                                required
+                            />
+                            <p className="mt-1 text-xs text-info flex items-center gap-1">
+                                <Bell className="h-3 w-3" />
+                                Tip: Send <code>/start</code> to your bot first to get your Chat ID and enable notifications.
+                            </p>
+                        </div>
+                    </div>
+                )
+            case 'whatsapp':
+                return (
+                    <div className="space-y-3">
+                        <div>
+                            <label htmlFor="apiUrl" className="block text-sm font-medium text-gray-700">API Gateway URL</label>
+                            <input
+                                id="apiUrl"
+                                type="url"
+                                value={formData.config.api_url || ''}
+                                onChange={e => setFormData({
+                                    ...formData,
+                                    config: { ...formData.config, api_url: e.target.value }
+                                })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                placeholder="https://api.ultramsg.com/instanceXXX/messages/chat"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="apiToken" className="block text-sm font-medium text-gray-700">API Token / Instance Key</label>
+                            <input
+                                id="apiToken"
+                                type="password"
+                                value={formData.config.api_token || ''}
+                                onChange={e => setFormData({
+                                    ...formData,
+                                    config: { ...formData.config, api_token: e.target.value }
+                                })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Target Phone Number</label>
+                            <input
+                                id="phoneNumber"
+                                type="text"
+                                value={formData.config.phone_number || ''}
+                                onChange={e => setFormData({
+                                    ...formData,
+                                    config: { ...formData.config, phone_number: e.target.value }
+                                })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                placeholder="62812345678"
+                                required
+                            />
+                        </div>
+                    </div>
+                )
+            default:
+                return (
+                    <div>
+                        <label htmlFor="webhookUrl" className="block text-sm font-medium text-gray-700">Webhook URL</label>
+                        <input
+                            id="webhookUrl"
+                            type="url"
+                            value={formData.config.webhook_url || ''}
+                            onChange={e => setFormData({
+                                ...formData,
+                                config: { ...formData.config, webhook_url: e.target.value }
+                            })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                            placeholder={formData.type === 'slack' ? 'https://hooks.slack.com/services/...' : 'https://discord.com/api/webhooks/...'}
+                            required
+                        />
+                    </div>
+                )
+        }
+    }
+
+    const renderChannelContent = () => {
+        if (loading) {
+            return <div className="text-center py-12 text-gray-500">Loading channels...</div>
+        }
+
+        if (channels.length === 0) {
+            return (
+                <div className="text-center py-12 bg-white rounded-lg shadow border border-gray-200">
+                    <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-medium text-gray-900">No channels configured</h3>
+                    <p className="text-gray-500 mt-1 mb-4">Add a notification channel to receive security alerts.</p>
+                    <button
+                        onClick={() => { resetForm(); setShowModal(true) }}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                        Create your first channel
+                    </button>
+                </div>
+            )
+        }
+
+        return (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {channels.map(channel => (
+                    <div key={channel.id} className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition p-5">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${getChannelStyles(channel.type)}`}>
+                                    {getChannelIcon(channel.type)}
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-gray-900">{channel.name}</h3>
+                                    <p className="text-xs text-gray-500 uppercase font-medium">{channel.type}</p>
+                                </div>
+                            </div>
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${channel.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                                }`}>
+                                {channel.enabled ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                                {channel.enabled ? 'Active' : 'Disabled'}
+                            </div>
+                        </div>
+
+                        <div className="space-y-3 mb-4">
+                            <div className="text-sm">
+                                <span className="text-gray-500 block text-xs">Destination:</span>
+                                <span className="font-mono text-xs bg-gray-50 px-2 py-1 rounded block truncate mt-1">
+                                    {getChannelDestination(channel)}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 block text-xs mb-1">Subscribed Events:</span>
+                                <div className="flex flex-wrap gap-1">
+                                    {channel.events.map(ev => (
+                                        <span key={ev} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">
+                                            {ev.replace('_', ' ')}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                            <button
+                                onClick={() => handleTest(channel)}
+                                className="p-1.5 text-gray-500 hover:text-blue-600 transition"
+                                title="Send Test Notification"
+                            >
+                                <Send className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={() => openEditModal(channel)}
+                                className="p-1.5 text-gray-500 hover:text-blue-600 transition"
+                                title="Edit"
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={() => handleDelete(channel.id)}
+                                className="p-1.5 text-gray-500 hover:text-red-600 transition"
+                                title="Delete"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
     return (
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
@@ -253,98 +489,7 @@ const NotificationSettings = () => {
                 </button>
             </div>
 
-            {loading ? (
-                <div className="text-center py-12 text-gray-500">Loading channels...</div>
-            ) : channels.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-lg shadow border border-gray-200">
-                    <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium text-gray-900">No channels configured</h3>
-                    <p className="text-gray-500 mt-1 mb-4">Add a notification channel to receive security alerts.</p>
-                    <button
-                        onClick={() => { resetForm(); setShowModal(true) }}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                        Create your first channel
-                    </button>
-                </div>
-            ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {channels.map(channel => (
-                        <div key={channel.id} className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition p-5">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${channel.type === 'slack' ? 'bg-purple-100 text-purple-600' :
-                                        channel.type === 'discord' ? 'bg-indigo-100 text-indigo-600' :
-                                            channel.type === 'email' ? 'bg-blue-100 text-blue-600' :
-                                                channel.type === 'telegram' ? 'bg-sky-100 text-sky-600' :
-                                                    channel.type === 'whatsapp' ? 'bg-green-100 text-green-600' :
-                                                        'bg-gray-100 text-gray-600'
-                                        }`}>
-                                        {channel.type === 'telegram' ? <SendHorizonal className="h-6 w-6" /> :
-                                            channel.type === 'whatsapp' ? <MessageCircle className="h-6 w-6" /> :
-                                                <Bell className="h-6 w-6" />}
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900">{channel.name}</h3>
-                                        <p className="text-xs text-gray-500 uppercase font-medium">{channel.type}</p>
-                                    </div>
-                                </div>
-                                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${channel.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                                    }`}>
-                                    {channel.enabled ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                                    {channel.enabled ? 'Active' : 'Disabled'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-3 mb-4">
-                                <div className="text-sm">
-                                    <span className="text-gray-500 block text-xs">Destination:</span>
-                                    <span className="font-mono text-xs bg-gray-50 px-2 py-1 rounded block truncate mt-1">
-                                        {channel.type === 'email' ? channel.config.email_address :
-                                            channel.type === 'telegram' ? `Chat: ${channel.config.chat_id}` :
-                                                channel.type === 'whatsapp' ? `To: ${channel.config.phone_number}` :
-                                                    channel.config.webhook_url}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span className="text-gray-500 block text-xs mb-1">Subscribed Events:</span>
-                                    <div className="flex flex-wrap gap-1">
-                                        {channel.events.map(ev => (
-                                            <span key={ev} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">
-                                                {ev.replace('_', ' ')}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                                <button
-                                    onClick={() => handleTest(channel)}
-                                    className="p-1.5 text-gray-500 hover:text-blue-600 transition"
-                                    title="Send Test Notification"
-                                >
-                                    <Send className="h-4 w-4" />
-                                </button>
-                                <button
-                                    onClick={() => openEditModal(channel)}
-                                    className="p-1.5 text-gray-500 hover:text-blue-600 transition"
-                                    title="Edit"
-                                >
-                                    <Pencil className="h-4 w-4" />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(channel.id)}
-                                    className="p-1.5 text-gray-500 hover:text-red-600 transition"
-                                    title="Delete"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+            {renderChannelContent()}
 
             {/* Modal */}
             {showModal && (
@@ -356,8 +501,9 @@ const NotificationSettings = () => {
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Channel Name</label>
+                                <label htmlFor="channelName" className="block text-sm font-medium text-gray-700">Channel Name</label>
                                 <input
+                                    id="channelName"
                                     type="text"
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -367,8 +513,9 @@ const NotificationSettings = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Channel Type</label>
+                                <label htmlFor="channelType" className="block text-sm font-medium text-gray-700">Channel Type</label>
                                 <select
+                                    id="channelType"
                                     value={formData.type}
                                     onChange={e => setFormData({ ...formData, type: e.target.value })}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
@@ -383,119 +530,16 @@ const NotificationSettings = () => {
                             </div>
 
                             {/* Dynamic Config Fields */}
-                            {formData.type === 'email' ? (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Email Address</label>
-                                    <input
-                                        type="email"
-                                        value={formData.config.email_address || ''}
-                                        onChange={e => setFormData({
-                                            ...formData,
-                                            config: { ...formData.config, email_address: e.target.value }
-                                        })}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                        required
-                                    />
-                                </div>
-                            ) : formData.type === 'telegram' ? (
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Bot Token</label>
-                                        <input
-                                            type="password"
-                                            value={formData.config.bot_token || ''}
-                                            onChange={e => setFormData({
-                                                ...formData,
-                                                config: { ...formData.config, bot_token: e.target.value }
-                                            })}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                            placeholder="123456789:ABCDefgh..."
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Chat ID</label>
-                                        <input
-                                            type="text"
-                                            value={formData.config.chat_id || ''}
-                                            onChange={e => setFormData({
-                                                ...formData,
-                                                config: { ...formData.config, chat_id: e.target.value }
-                                            })}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                            placeholder="-100123456789"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                            ) : formData.type === 'whatsapp' ? (
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">API Gateway URL</label>
-                                        <input
-                                            type="url"
-                                            value={formData.config.api_url || ''}
-                                            onChange={e => setFormData({
-                                                ...formData,
-                                                config: { ...formData.config, api_url: e.target.value }
-                                            })}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                            placeholder="https://api.ultramsg.com/instanceXXX/messages/chat"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">API Token / Instance Key</label>
-                                        <input
-                                            type="password"
-                                            value={formData.config.api_token || ''}
-                                            onChange={e => setFormData({
-                                                ...formData,
-                                                config: { ...formData.config, api_token: e.target.value }
-                                            })}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Target Phone Number</label>
-                                        <input
-                                            type="text"
-                                            value={formData.config.phone_number || ''}
-                                            onChange={e => setFormData({
-                                                ...formData,
-                                                config: { ...formData.config, phone_number: e.target.value }
-                                            })}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                            placeholder="62812345678"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Webhook URL</label>
-                                    <input
-                                        type="url"
-                                        value={formData.config.webhook_url || ''}
-                                        onChange={e => setFormData({
-                                            ...formData,
-                                            config: { ...formData.config, webhook_url: e.target.value }
-                                        })}
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                                        placeholder={formData.type === 'slack' ? 'https://hooks.slack.com/services/...' : 'https://discord.com/api/webhooks/...'}
-                                        required
-                                    />
-                                </div>
-                            )}
+                            {renderConfigFields()}
 
                             {/* Subscribed Events */}
                             <div>
                                 <span className="block text-sm font-medium text-gray-700 mb-2">Trigger Events</span>
                                 <div className="space-y-2">
-                                    {eventTypes.map(event => (
-                                        <label key={event.id} className="flex items-center gap-2">
+                                    {EVENT_TYPES.map(event => (
+                                        <label key={event.id} htmlFor={`event-${event.id}`} className="flex items-center gap-2">
                                             <input
+                                                id={`event-${event.id}`}
                                                 type="checkbox"
                                                 checked={formData.events.includes(event.id)}
                                                 onChange={() => toggleEvent(event.id)}
