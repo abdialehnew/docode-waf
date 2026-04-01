@@ -170,7 +170,7 @@ server {
     error_log /var/log/nginx/{{.Domain}}_error.log warn;
     
     # Per-VHost Upload Size Limit
-    client_max_body_size 100m;
+    client_max_body_size {{.MaxUploadSize}}m;
     
     # Static Assets Caching (Performance Optimization)
     location ~* \.(jpg|jpeg|png|gif|ico|svg|webp|avif)$ {
@@ -217,8 +217,8 @@ server {
     {{if not (hasAPILocation .CustomLocations)}}
     # Rate Limiting for API endpoints
     location ~* ^/api/ {
-        limit_req zone=api burst=200 nodelay;
-        limit_req_status 429;
+        {{if eq .DefenseMode "defense"}}limit_req zone=api burst=200 nodelay;
+        limit_req_status 429;{{end}}
         
         proxy_pass http://waf:8080;
         proxy_set_header Host $host;
@@ -254,8 +254,8 @@ server {
     # Proxy to WAF - All requests go through WAF middleware first
     # Request Handling based on VHost Type
     location / {
-        # Rate limiting
-        limit_req zone=general burst=100 nodelay;
+        {{if eq .DefenseMode "defense"}}# Rate limiting
+        limit_req zone=general burst=100 nodelay;{{end}}
         
         {{if eq .Type "dead"}}
         # Return 404 for dead hosts
@@ -279,10 +279,10 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         
-        # Per-VHost Timeouts (5 minutes for slow APIs)
-        proxy_connect_timeout 300s;
-        proxy_send_timeout 300s;
-        proxy_read_timeout 300s;
+        # Per-VHost Timeouts
+        proxy_connect_timeout {{.ProxyConnectTimeout}}s;
+        proxy_send_timeout {{.ProxyConnectTimeout}}s;
+        proxy_read_timeout {{.ProxyReadTimeout}}s;
         
         # Proxy Cache Configuration
         proxy_cache backend_cache;

@@ -83,7 +83,10 @@ func (s *VHostService) ListVHosts() ([]*models.VHost, error) {
 		       v.ssl_certificate_id::text as ssl_certificate_id, 
 		       v.ssl_cert_path, v.ssl_key_path, v.enabled, v.created_at, v.updated_at,
                COALESCE(v.type, 'proxy') as type, COALESCE(v.custom_config, '') as custom_config,
-               COALESCE(v.load_balance_method, 'round_robin') as load_balance_method
+               COALESCE(v.load_balance_method, 'round_robin') as load_balance_method,
+               v.defense_mode, v.max_upload_size, v.proxy_read_timeout, v.proxy_connect_timeout,
+               v.bot_detection_enabled, v.bot_detection_type, v.recaptcha_version,
+               v.rate_limit_enabled, v.rate_limit_requests, v.rate_limit_window
 		FROM vhosts v
 		WHERE v.enabled = true
 		ORDER BY v.created_at DESC
@@ -106,7 +109,10 @@ func (s *VHostService) GetVHostByID(id string) (*models.VHost, error) {
 		       v.ssl_certificate_id::text as ssl_certificate_id,
 		       v.ssl_cert_path, v.ssl_key_path, v.enabled, v.created_at, v.updated_at,
                COALESCE(v.type, 'proxy') as type, COALESCE(v.custom_config, '') as custom_config,
-               COALESCE(v.load_balance_method, 'round_robin') as load_balance_method
+               COALESCE(v.load_balance_method, 'round_robin') as load_balance_method,
+               v.defense_mode, v.max_upload_size, v.proxy_read_timeout, v.proxy_connect_timeout,
+               v.bot_detection_enabled, v.bot_detection_type, v.recaptcha_version,
+               v.rate_limit_enabled, v.rate_limit_requests, v.rate_limit_window
 		FROM vhosts v
 		WHERE v.id = $1
 	`

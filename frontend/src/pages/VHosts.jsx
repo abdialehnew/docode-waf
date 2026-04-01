@@ -366,7 +366,16 @@ const VHosts = () => {
                   <span className="text-gray-600">Backend:</span>
                   <p className="font-mono text-xs mt-1">{vhost.backend_url}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                    !vhost.defense_mode || vhost.defense_mode === 'defense' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                    vhost.defense_mode === 'audited' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                    'bg-gray-50 text-gray-700 border-gray-200'
+                  }`}>
+                    {!vhost.defense_mode || vhost.defense_mode === 'defense' ? 'Defense Mode' : 
+                     vhost.defense_mode === 'audited' ? 'Audited Mode' : 
+                     'Offline Mode'}
+                  </span>
                   {vhost.ssl_enabled && (
                     <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                       SSL
@@ -424,6 +433,9 @@ const VHosts = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     SSL
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Def Mode
+                  </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('enabled')}
@@ -479,6 +491,17 @@ const VHosts = () => {
                           Disabled
                         </span>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                        !vhost.defense_mode || vhost.defense_mode === 'defense' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                        vhost.defense_mode === 'audited' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                        'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}>
+                        {!vhost.defense_mode || vhost.defense_mode === 'defense' ? 'Defense' : 
+                         vhost.defense_mode === 'audited' ? 'Audited' : 
+                         'Offline'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 rounded text-xs ${vhost.enabled
@@ -694,6 +717,18 @@ const VHosts = () => {
                     <label className="text-xs text-gray-500">SSL</label>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${selectedVHost.ssl_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                       {selectedVHost.ssl_enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Defense Mode</label>
+                    <span className={`px-2 py-1 rounded text-xs font-medium border ${
+                      !selectedVHost.defense_mode || selectedVHost.defense_mode === 'defense' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                      selectedVHost.defense_mode === 'audited' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                      'bg-gray-50 text-gray-700 border-gray-200'
+                    }`}>
+                      {!selectedVHost.defense_mode || selectedVHost.defense_mode === 'defense' ? 'Defense' : 
+                       selectedVHost.defense_mode === 'audited' ? 'Audited' : 
+                       'Offline'}
                     </span>
                   </div>
                 </div>

@@ -39,6 +39,7 @@ const initialFormData = {
     region_filtering_enabled: false,
     region_whitelist: [],
     region_blacklist: [],
+    defense_mode: 'defense',
     custom_locations: [],
     custom_headers: {},
 }
@@ -148,6 +149,7 @@ const VHostForm = () => {
                 region_filtering_enabled: vhost.region_filtering_enabled || false,
                 region_whitelist: vhost.region_whitelist || [],
                 region_blacklist: vhost.region_blacklist || [],
+                defense_mode: vhost.defense_mode || 'defense',
                 custom_locations: vhost.custom_locations || [],
                 custom_headers: vhost.custom_headers || {},
             })
@@ -599,6 +601,29 @@ const VHostForm = () => {
                             <label htmlFor="enabled" className="text-sm">Enable Virtual Host</label>
                         </div>
 
+                        {/* Defense Mode */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="defense_mode" className="label">Defense Mode</label>
+                                <select id="defense_mode" className="input" value={formData.defense_mode}
+                                    onChange={(e) => {
+                                        const newMode = e.target.value;
+                                        const updates = { defense_mode: newMode };
+                                        if (newMode !== 'defense') {
+                                            updates.bot_detection_enabled = false;
+                                            updates.rate_limit_enabled = false;
+                                            updates.region_filtering_enabled = false;
+                                        }
+                                        setFormData({ ...formData, ...updates });
+                                    }}>
+                                    <option value="defense">Defense (Active Mitigation)</option>
+                                    <option value="audited">Audited (Log Only)</option>
+                                    <option value="offline">Offline (WAF Disabled)</option>
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Defense: Block attacks. Audited: Log only. Offline: WAF disabled.</p>
+                            </div>
+                        </div>
+
                         {/* Advanced Settings Toggle */}
                         <div className="border-t border-gray-200 pt-4">
                             <button type="button" onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
@@ -667,8 +692,10 @@ const VHostForm = () => {
                                 <div className="border-t border-gray-300 pt-4">
                                     <div className="flex items-center gap-2 mb-3">
                                         <input type="checkbox" id="bot_detection" checked={formData.bot_detection_enabled}
+                                            disabled={formData.defense_mode !== 'defense'}
                                             onChange={(e) => setFormData({ ...formData, bot_detection_enabled: e.target.checked })} />
-                                        <label htmlFor="bot_detection" className="text-sm font-medium">Enable Bot Detection</label>
+                                        <label htmlFor="bot_detection" className={`text-sm font-medium ${formData.defense_mode !== 'defense' ? 'text-gray-400' : ''}`}>Enable Bot Detection</label>
+                                        {formData.defense_mode !== 'defense' && <span className="text-xs text-orange-500">(Requires Defense Mode)</span>}
                                     </div>
                                     {formData.bot_detection_enabled && (
                                         <div className="space-y-3">
@@ -705,8 +732,10 @@ const VHostForm = () => {
                                 <div className="border-t border-gray-300 pt-4">
                                     <div className="flex items-center gap-2 mb-3">
                                         <input type="checkbox" id="rate_limit" checked={formData.rate_limit_enabled}
+                                            disabled={formData.defense_mode !== 'defense'}
                                             onChange={(e) => setFormData({ ...formData, rate_limit_enabled: e.target.checked })} />
-                                        <label htmlFor="rate_limit" className="text-sm font-medium">Enable Rate Limiting</label>
+                                        <label htmlFor="rate_limit" className={`text-sm font-medium ${formData.defense_mode !== 'defense' ? 'text-gray-400' : ''}`}>Enable Rate Limiting</label>
+                                        {formData.defense_mode !== 'defense' && <span className="text-xs text-orange-500">(Requires Defense Mode)</span>}
                                     </div>
                                     {formData.rate_limit_enabled && (
                                         <div className="grid grid-cols-2 gap-3">
@@ -733,8 +762,10 @@ const VHostForm = () => {
                                 <div className="border-t border-gray-300 pt-4">
                                     <div className="flex items-center gap-2 mb-3">
                                         <input type="checkbox" id="region_filtering" checked={formData.region_filtering_enabled}
+                                            disabled={formData.defense_mode !== 'defense'}
                                             onChange={(e) => setFormData({ ...formData, region_filtering_enabled: e.target.checked })} />
-                                        <label htmlFor="region_filtering" className="text-sm font-medium">Enable Region Filtering</label>
+                                        <label htmlFor="region_filtering" className={`text-sm font-medium ${formData.defense_mode !== 'defense' ? 'text-gray-400' : ''}`}>Enable Region Filtering</label>
+                                        {formData.defense_mode !== 'defense' && <span className="text-xs text-orange-500">(Requires Defense Mode)</span>}
                                     </div>
                                     {formData.region_filtering_enabled && (
                                         <div className="space-y-3">

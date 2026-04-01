@@ -39,6 +39,15 @@ type VHost struct {
 	RegionBlacklist        []string  `json:"region_blacklist" db:"region_blacklist"`
 	RegionFilteringEnabled bool      `json:"region_filtering_enabled" db:"region_filtering_enabled"`
 	DefenseMode            string    `json:"defense_mode" db:"defense_mode"`
+	MaxUploadSize          int       `json:"max_upload_size" db:"max_upload_size"`
+	ProxyReadTimeout       int       `json:"proxy_read_timeout" db:"proxy_read_timeout"`
+	ProxyConnectTimeout    int       `json:"proxy_connect_timeout" db:"proxy_connect_timeout"`
+	BotDetectionEnabled    bool      `json:"bot_detection_enabled" db:"bot_detection_enabled"`
+	BotDetectionType       string    `json:"bot_detection_type" db:"bot_detection_type"`
+	RecaptchaVersion       string    `json:"recaptcha_version" db:"recaptcha_version"`
+	RateLimitEnabled       bool      `json:"rate_limit_enabled" db:"rate_limit_enabled"`
+	RateLimitRequests      int       `json:"rate_limit_requests" db:"rate_limit_requests"`
+	RateLimitWindow        int       `json:"rate_limit_window" db:"rate_limit_window"`
 	CreatedAt              time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at" db:"updated_at"`
 }
