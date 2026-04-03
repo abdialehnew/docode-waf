@@ -55,12 +55,12 @@ const Settings = () => {
         return
       }
 
-      // Validate file size (max 2MB)
-      if (file.size > 2 * 1024 * 1024) {
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
         Swal.fire({
           icon: 'error',
-          title: 'File Too Large',
-          text: 'Logo file size must be less than 2MB'
+          title: 'File Terlalu Besar',
+          text: 'Ukuran file logo maksimal adalah 10MB'
         })
         return
       }
@@ -86,8 +86,8 @@ const Settings = () => {
       await api.post('/settings/app', appSettings)
       await Swal.fire({
         icon: 'success',
-        title: 'Saved!',
-        text: 'Application settings saved successfully!',
+        title: 'Berhasil!',
+        text: 'Pengaturan aplikasi berhasil disimpan!',
         timer: 2000,
         showConfirmButton: false
       })
@@ -97,8 +97,8 @@ const Settings = () => {
       logger.error('Failed to save app settings:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Save Failed',
-        text: 'Failed to save settings: ' + (error.response?.data?.error || error.message)
+        title: 'Gagal Menyimpan',
+        text: 'Gagal menyimpan pengaturan: ' + (error.response?.data?.error || error.message)
       })
     } finally {
       setLoading(false)
@@ -170,7 +170,7 @@ const Settings = () => {
                       {logoPreview ? 'Change Logo' : 'Upload Logo'}
                     </label>
                     <p className="text-xs text-gray-500 mt-1">
-                      PNG, JPG, SVG up to 2MB. Recommended: 200x200px
+                      PNG, JPG, SVG hingga 10MB. Direkomendasikan: 200x200px
                     </p>
                   </div>
                 </div>

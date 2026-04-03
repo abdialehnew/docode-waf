@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Shield, Mail, Lock, AlertCircle, CheckCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { getAppSettings } from '../services/api';
+import logger from '../utils/logger';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -17,6 +19,26 @@ const ForgotPassword = () => {
   const [loading, setLoading] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [appSettings, setAppSettings] = useState({
+    app_name: '',
+    app_logo: ''
+  });
+
+  useEffect(() => {
+    loadAppSettings();
+  }, []);
+
+  const loadAppSettings = async () => {
+    try {
+      const response = await getAppSettings();
+      if (response.data) {
+        setAppSettings(response.data);
+        document.title = (response.data.app_name || 'WAF') + ' - Reset Password';
+      }
+    } catch (error) {
+      logger.error('Failed to load app settings:', error);
+    }
+  };
 
   const handleRequestReset = async (e) => {
     e.preventDefault();
@@ -78,10 +100,20 @@ const ForgotPassword = () => {
       <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-            <Shield className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Docode WAF</h1>
+          {appSettings.app_logo ? (
+            <div className="flex justify-center mb-4">
+              <img
+                src={appSettings.app_logo}
+                alt={appSettings.app_name}
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
+              <Shield className="w-8 h-8 text-white" />
+            </div>
+          )}
+          <h1 className="text-3xl font-bold text-white mb-2">{appSettings.app_name || 'WAF'}</h1>
           <p className="text-gray-400">Reset Your Password</p>
         </div>
 
@@ -255,7 +287,7 @@ const ForgotPassword = () => {
 
         {/* Footer */}
         <div className="mt-8 text-center text-gray-500 text-sm">
-          <p>&copy; 2025 Docode WAF. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} {appSettings.app_name || 'WAF'}. All rights reserved.</p>
         </div>
       </div>
     </div>
