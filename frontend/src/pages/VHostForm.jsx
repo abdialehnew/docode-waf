@@ -42,6 +42,15 @@ const initialFormData = {
     defense_mode: 'defense',
     custom_locations: [],
     custom_headers: {},
+    ip_group_ids: [],
+    hsts_enabled: false,
+    hsts_max_age: 31536000,
+    hsts_include_subdomains: false,
+    hsts_preload: false,
+    brotli_enabled: true,
+    http3_enabled: false,
+    hide_server_tokens: true,
+    security_headers_enabled: true,
 }
 
 const VHostForm = () => {
@@ -70,12 +79,14 @@ const VHostForm = () => {
     const [newLocation, setNewLocation] = useState({ path: '', proxy_pass: '', config: '', websocket_enabled: false, backends: [], load_balance_method: 'round_robin' })
     const [newHeader, setNewHeader] = useState({ key: '', value: '' })
     const [locationBackendCheck, setLocationBackendCheck] = useState({ status: null, message: '' })
+    const [ipGroups, setIpGroups] = useState([])
 
     // Preview
 
 
     useEffect(() => {
         loadCertificates()
+        loadIpGroups()
         if (isEditMode) {
             loadVHost()
         }
@@ -152,17 +163,34 @@ const VHostForm = () => {
                 defense_mode: vhost.defense_mode || 'defense',
                 custom_locations: vhost.custom_locations || [],
                 custom_headers: vhost.custom_headers || {},
+                ip_group_ids: vhost.ip_group_ids || [],
+                hsts_enabled: vhost.hsts_enabled || false,
+                hsts_max_age: vhost.hsts_max_age || 31536000,
+                hsts_include_subdomains: vhost.hsts_include_subdomains || false,
+                hsts_preload: vhost.hsts_preload || false,
+                brotli_enabled: vhost.brotli_enabled === undefined ? true : vhost.brotli_enabled,
+                http3_enabled: vhost.http3_enabled || false,
+                hide_server_tokens: vhost.hide_server_tokens === undefined ? true : vhost.hide_server_tokens,
+                security_headers_enabled: vhost.security_headers_enabled === undefined ? true : vhost.security_headers_enabled,
             })
             // Save domain for config editor
             if (vhost.domain) {
                 setConfigDomain(vhost.domain.split(' ')[0])
             }
+            setLoading(false)
         } catch (error) {
             logger.error('Failed to load vhost:', error)
             toast.error('Failed to load virtual host')
-            navigate('/vhosts')
-        } finally {
             setLoading(false)
+        }
+    }
+
+    const loadIpGroups = async () => {
+        try {
+            const response = await api.get('/ip-groups')
+            setIpGroups(response.data || [])
+        } catch (error) {
+            logger.error('Failed to load IP groups:', error)
         }
     }
 
@@ -241,7 +269,8 @@ const VHostForm = () => {
             navigate('/vhosts')
         } catch (error) {
             logger.error('Failed to save vhost:', error)
-            toast.error('Failed to save virtual host')
+            const errorMessage = error.response?.data?.error || 'Failed to save virtual host'
+            toast.error(errorMessage)
         } finally {
             setSaving(false)
         }
@@ -433,7 +462,7 @@ const VHostForm = () => {
 
                         {/* Domain Names */}
                         <div>
-                            <label className="label">Domain Names</label>
+                            <label htmlFor="domain-input" className="label">Domain Names</label>
                             <div className="flex flex-wrap items-center gap-2 p-2 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent bg-white">
                                 {formData.domain.map((domain, index) => (
                                     <span key={index} className="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-md flex items-center gap-1">
@@ -443,7 +472,7 @@ const VHostForm = () => {
                                         }} className="hover:text-red-500">&times;</button>
                                     </span>
                                 ))}
-                                <input type="text" className="flex-1 min-w-[120px] outline-none text-sm py-1"
+                                <input id="domain-input" type="text" className="flex-1 min-w-[120px] outline-none text-sm py-1"
                                     placeholder={formData.domain.length === 0 ? "example.com (Press Enter)" : ""}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' || e.key === ' ' || e.key === ',') {
@@ -645,8 +674,8 @@ const VHostForm = () => {
 
                                 {/* HTTP Version */}
                                 <div>
-                                    <label className="label">HTTP Version</label>
-                                    <select className="input" value={formData.http_version}
+                                    <label htmlFor="http_version" className="label">HTTP Version</label>
+                                    <select id="http_version" className="input" value={formData.http_version}
                                         onChange={(e) => setFormData({ ...formData, http_version: e.target.value })}>
                                         <option value="http/1.1">HTTP/1.1</option>
                                         <option value="http/2">HTTP/2</option>
@@ -655,8 +684,8 @@ const VHostForm = () => {
 
                                 {/* TLS Version */}
                                 <div>
-                                    <label className="label">TLS Version (SSL/TLS Protocol)</label>
-                                    <select className="input" value={formData.tls_version}
+                                    <label htmlFor="tls_version" className="label">TLS Version (SSL/TLS Protocol)</label>
+                                    <select id="tls_version" className="input" value={formData.tls_version}
                                         onChange={(e) => setFormData({ ...formData, tls_version: e.target.value })}>
                                         <option value="TLSv1.2">TLS 1.2 (Recommended)</option>
                                         <option value="TLSv1.3">TLS 1.3 (Most Secure)</option>
@@ -668,8 +697,8 @@ const VHostForm = () => {
 
                                 {/* Max Upload Size */}
                                 <div>
-                                    <label className="label">Max Upload Size (MB)</label>
-                                    <input type="number" className="input" min="1" max="1024" value={formData.max_upload_size}
+                                    <label htmlFor="max_upload_size" className="label">Max Upload Size (MB)</label>
+                                    <input id="max_upload_size" type="number" className="input" min="1" max="1024" value={formData.max_upload_size}
                                         onChange={(e) => setFormData({ ...formData, max_upload_size: Number.parseInt(e.target.value) || 10 })} />
                                     <p className="text-xs text-gray-500 mt-1">Maximum file upload size (client_max_body_size)</p>
                                 </div>
@@ -677,13 +706,13 @@ const VHostForm = () => {
                                 {/* Proxy Timeouts */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="label">Read Timeout (seconds)</label>
-                                        <input type="number" className="input" min="1" max="3600" value={formData.proxy_read_timeout}
+                                        <label htmlFor="proxy_read_timeout" className="label">Read Timeout (seconds)</label>
+                                        <input id="proxy_read_timeout" type="number" className="input" min="1" max="3600" value={formData.proxy_read_timeout}
                                             onChange={(e) => setFormData({ ...formData, proxy_read_timeout: Number.parseInt(e.target.value) || 60 })} />
                                     </div>
                                     <div>
-                                        <label className="label">Connect Timeout (seconds)</label>
-                                        <input type="number" className="input" min="1" max="300" value={formData.proxy_connect_timeout}
+                                        <label htmlFor="proxy_connect_timeout" className="label">Connect Timeout (seconds)</label>
+                                        <input id="proxy_connect_timeout" type="number" className="input" min="1" max="300" value={formData.proxy_connect_timeout}
                                             onChange={(e) => setFormData({ ...formData, proxy_connect_timeout: Number.parseInt(e.target.value) || 60 })} />
                                     </div>
                                 </div>
@@ -700,8 +729,8 @@ const VHostForm = () => {
                                     {formData.bot_detection_enabled && (
                                         <div className="space-y-3">
                                             <div>
-                                                <label className="label">Challenge Type</label>
-                                                <select className="input" value={formData.bot_detection_type}
+                                                <label htmlFor="bot_detection_type" className="label">Challenge Type</label>
+                                                <select id="bot_detection_type" className="input" value={formData.bot_detection_type}
                                                     onChange={(e) => setFormData({ ...formData, bot_detection_type: e.target.value })}>
                                                     <option value="turnstile">Cloudflare Turnstile</option>
                                                     <option value="captcha">Google reCAPTCHA</option>
@@ -711,8 +740,8 @@ const VHostForm = () => {
                                             </div>
                                             {formData.bot_detection_type === 'captcha' && (
                                                 <div>
-                                                    <label className="label">reCAPTCHA Version</label>
-                                                    <select className="input" value={formData.recaptcha_version || 'v2'}
+                                                    <label htmlFor="recaptcha_version" className="label">reCAPTCHA Version</label>
+                                                    <select id="recaptcha_version" className="input" value={formData.recaptcha_version || 'v2'}
                                                         onChange={(e) => setFormData({ ...formData, recaptcha_version: e.target.value })}>
                                                         <option value="v2">v2 (Checkbox - &quot;I&apos;m not a robot&quot;)</option>
                                                         <option value="v3">v3 (Invisible - Score based)</option>
@@ -740,13 +769,13 @@ const VHostForm = () => {
                                     {formData.rate_limit_enabled && (
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="label">Max Requests</label>
-                                                <input type="number" className="input" min="1" max="10000" value={formData.rate_limit_requests}
+                                                <label htmlFor="rate_limit_requests" className="label">Max Requests</label>
+                                                <input id="rate_limit_requests" type="number" className="input" min="1" max="10000" value={formData.rate_limit_requests}
                                                     onChange={(e) => setFormData({ ...formData, rate_limit_requests: Number.parseInt(e.target.value) || 100 })} />
                                             </div>
                                             <div>
-                                                <label className="label">Time Window (seconds)</label>
-                                                <input type="number" className="input" min="1" max="3600" value={formData.rate_limit_window}
+                                                <label htmlFor="rate_limit_window" className="label">Time Window (seconds)</label>
+                                                <input id="rate_limit_window" type="number" className="input" min="1" max="3600" value={formData.rate_limit_window}
                                                     onChange={(e) => setFormData({ ...formData, rate_limit_window: Number.parseInt(e.target.value) || 60 })} />
                                             </div>
                                             <div className="col-span-2">
@@ -770,15 +799,15 @@ const VHostForm = () => {
                                     {formData.region_filtering_enabled && (
                                         <div className="space-y-3">
                                             <div>
-                                                <label className="label">Whitelist Countries (ISO codes, e.g., US,GB,ID)</label>
-                                                <input type="text" className="input" placeholder="US,GB,ID,SG"
+                                                <label htmlFor="region_whitelist" className="label">Whitelist Countries (ISO codes, e.g., US,GB,ID)</label>
+                                                <input id="region_whitelist" type="text" className="input" placeholder="US,GB,ID,SG"
                                                     value={formData.region_whitelist?.join(',') || ''}
                                                     onChange={(e) => { const codes = e.target.value.split(',').map(c => c.trim().toUpperCase()).filter(Boolean); setFormData({ ...formData, region_whitelist: codes }) }} />
                                                 <p className="text-xs text-gray-500 mt-1">If set, ONLY these countries are allowed. Leave empty to allow all except blacklisted.</p>
                                             </div>
                                             <div>
-                                                <label className="label">Blacklist Countries (ISO codes, e.g., CN,RU)</label>
-                                                <input type="text" className="input" placeholder="CN,RU,KP"
+                                                <label htmlFor="region_blacklist" className="label">Blacklist Countries (ISO codes, e.g., CN,RU)</label>
+                                                <input id="region_blacklist" type="text" className="input" placeholder="CN,RU,KP"
                                                     value={formData.region_blacklist?.join(',') || ''}
                                                     onChange={(e) => { const codes = e.target.value.split(',').map(c => c.trim().toUpperCase()).filter(Boolean); setFormData({ ...formData, region_blacklist: codes }) }} />
                                                 <p className="text-xs text-gray-500 mt-1">These countries will be blocked. Only applies if whitelist is empty.</p>
@@ -793,6 +822,126 @@ const VHostForm = () => {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+
+                                {/* IP Access Control */}
+                                <div className="border-t border-gray-300 pt-4">
+                                    <label className="label flex items-center gap-2">
+                                        <Settings2 className="w-4 h-4 text-primary-600" />
+                                        IP Access Control (IP Groups)
+                                    </label>
+                                    <p className="text-xs text-gray-500 mb-3">
+                                        Restrict access to this Virtual Host using pre-defined IP Groups. Enforcement is handled by Nginx.
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1">
+                                        {ipGroups.map((group) => (
+                                            <div key={group.id} className={`flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer ${formData.ip_group_ids?.includes(group.id) ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+                                                onClick={() => {
+                                                    const current = formData.ip_group_ids || [];
+                                                    const updated = current.includes(group.id)
+                                                        ? current.filter(id => id !== group.id)
+                                                        : [...current, group.id];
+                                                    setFormData({ ...formData, ip_group_ids: updated });
+                                                }}>
+                                                <input type="checkbox" className="mt-1" checked={formData.ip_group_ids?.includes(group.id)} readOnly />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-sm font-semibold truncate">{group.name}</span>
+                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${group.type === 'whitelist' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                            {group.type}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[11px] text-gray-500 truncate">{group.description || 'No description'}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {ipGroups.length === 0 && (
+                                            <div className="col-span-full py-4 text-center text-sm text-gray-400 border border-dashed border-gray-300 rounded-lg">
+                                                No IP Groups found. Create them in the "IP Groups" menu.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Security Settings Section */}
+                                <div className="border-t border-gray-300 pt-4">
+                                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+                                        <Settings2 className="w-4 h-4 text-primary-600" />
+                                        Advanced Security
+                                    </h3>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <input type="checkbox" id="security_headers" checked={formData.security_headers_enabled}
+                                                    onChange={(e) => setFormData({ ...formData, security_headers_enabled: e.target.checked })} />
+                                                <label htmlFor="security_headers" className="text-sm">Enable Security Headers</label>
+                                            </div>
+                                            <p className="text-xs text-gray-500 ml-6">Adds X-Frame-Options, X-Content-Type-Options, etc.</p>
+
+                                            <div className="flex items-center gap-2">
+                                                <input type="checkbox" id="hide_server" checked={formData.hide_server_tokens}
+                                                    onChange={(e) => setFormData({ ...formData, hide_server_tokens: e.target.checked })} />
+                                                <label htmlFor="hide_server" className="text-sm">Hide Server Tokens</label>
+                                            </div>
+                                            <p className="text-xs text-gray-500 ml-6">Removes Nginx version from Server header and error pages.</p>
+                                        </div>
+
+                                        <div className="space-y-3 border-l border-gray-200 pl-4">
+                                            <div className="flex items-center gap-2">
+                                                <input type="checkbox" id="hsts" checked={formData.hsts_enabled}
+                                                    onChange={(e) => setFormData({ ...formData, hsts_enabled: e.target.checked })} />
+                                                <label htmlFor="hsts" className="text-sm font-medium">Enable HSTS</label>
+                                            </div>
+                                            {formData.hsts_enabled && (
+                                                <div className="space-y-3 ml-6">
+                                                    <div>
+                                                        <label htmlFor="hsts_max_age" className="label text-xs">Max Age (seconds)</label>
+                                                        <input id="hsts_max_age" type="number" className="input text-sm py-1" value={formData.hsts_max_age}
+                                                            onChange={(e) => setFormData({ ...formData, hsts_max_age: Number.parseInt(e.target.value) || 31536000 })} />
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="checkbox" id="hsts_subdomains" checked={formData.hsts_include_subdomains}
+                                                            onChange={(e) => setFormData({ ...formData, hsts_include_subdomains: e.target.checked })} />
+                                                        <label htmlFor="hsts_subdomains" className="text-sm">Include Subdomains</label>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="checkbox" id="hsts_preload" checked={formData.hsts_preload}
+                                                            onChange={(e) => setFormData({ ...formData, hsts_preload: e.target.checked })} />
+                                                        <label htmlFor="hsts_preload" className="text-sm">Preload</label>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Performance & Acceleration Section */}
+                                <div className="border-t border-gray-300 pt-4">
+                                    <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+                                        <Settings2 className="w-4 h-4 text-primary-600" />
+                                        Performance & Speed
+                                    </h3>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <input type="checkbox" id="brotli" checked={formData.brotli_enabled}
+                                                    onChange={(e) => setFormData({ ...formData, brotli_enabled: e.target.checked })} />
+                                                <label htmlFor="brotli" className="text-sm font-medium">Enable Brotli Compression</label>
+                                            </div>
+                                            <p className="text-xs text-gray-500 ml-6">Modern compression for faster page loads (better than Gzip).</p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <input type="checkbox" id="http3" checked={formData.http3_enabled}
+                                                    onChange={(e) => setFormData({ ...formData, http3_enabled: e.target.checked })} />
+                                                <label htmlFor="http3" className="text-sm font-medium">Enable HTTP/3 (QUIC)</label>
+                                            </div>
+                                            <p className="text-xs text-gray-500 ml-6">Next-gen protocol over UDP. Requires UDP port 443 to be open.</p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Custom Headers */}

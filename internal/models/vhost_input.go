@@ -31,4 +31,17 @@ type VHostInput struct {
 	DefenseMode            string                   `json:"defense_mode"`
 	CustomHeaders          map[string]interface{}   `json:"custom_headers"`
 	CustomLocations        []map[string]interface{} `json:"custom_locations"`
+	IPGroupIDs             []string                 `json:"ip_group_ids"`
+	CacheEnabled           bool                     `json:"cache_enabled"`
+	CacheTTL               int                      `json:"cache_ttl"`
+	CacheMethods           []string                 `json:"cache_methods"`
+	CacheIgnoreHeaders     bool                     `json:"cache_ignore_headers"`
+	HSTSEnabled            bool                     `json:"hsts_enabled"`
+	HSTSMaxAge             int                      `json:"hsts_max_age"`
+	HSTSIncludeSubdomains bool                     `json:"hsts_include_subdomains"`
+	HSTSPreload            bool                     `json:"hsts_preload"`
+	BrotliEnabled          bool                     `json:"brotli_enabled"`
+	HTTP3Enabled           bool                     `json:"http3_enabled"`
+	HideServerTokens       bool                     `json:"hide_server_tokens"`
+	SecurityHeadersEnabled bool                     `json:"security_headers_enabled"`
 }

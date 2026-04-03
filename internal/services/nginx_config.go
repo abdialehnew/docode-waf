@@ -59,9 +59,19 @@ func parseJSONBackends(jsonStr string, backends *[]string) error {
 
 type VHostWithLocations struct {
 	*models.VHost
-	CustomLocations []CustomLocation
-	UpstreamName    string // Sanitized domain name for upstream
-	HasUpstream     bool   // True if multiple backends configured
+	CustomLocations      []CustomLocation
+	IPRules              []IPRule
+	UpstreamName         string // Sanitized domain name for upstream
+	HasUpstream          bool   // True if multiple backends configured
+	OCSPStaplingEnabled  bool   // True if certificate has an issuer (not self-signed)
+	RateLimitRate        string // Calculated rate (e.g., 10r/s)
+	RateLimitBurst       int    // Burst value for limit_req
+	GeoIPAvailable       bool   // True if MaxMind database exists
+}
+
+type IPRule struct {
+	Address string
+	Action  string // allow or deny
 }
 
 type CustomLocation struct {
@@ -104,6 +114,10 @@ upstream {{.UpstreamName}}_backend {
     keepalive_timeout 60s;
 }
 {{end}}{{end}}
+{{if .RateLimitEnabled}}
+# Rate Limiting Zone for this VHost
+limit_req_zone $binary_remote_addr zone=rate_{{sanitizeDomainForUpstream .Domain}}:10m rate={{.RateLimitRate}};
+{{end}}
 server {
     listen 80;
     server_name {{.Domain}};
@@ -122,10 +136,10 @@ server {
     }
     
     # Security Headers for HTTP
-    add_header X-Frame-Options "SAMEORIGIN" always;
+    {{if .SecurityHeadersEnabled}}add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
-
+    {{end}}
     {{if .SSLEnabled}}
     # Redirect HTTP to HTTPS
     return 301 https://$server_name$request_uri;
@@ -133,8 +147,16 @@ server {
 
 server {
     listen 443 ssl;
+    {{if .HTTP3Enabled}}listen 443 quic reuseport;
+    http3 on;
+    add_header Alt-Svc 'h3=":443"; ma=86400' always;
+    {{end}}
     http2 on;
     server_name {{.Domain}};
+    {{if .RateLimitEnabled}}
+    # Rate Limiting
+    limit_req zone=rate_{{sanitizeDomainForUpstream .Domain}} burst={{.RateLimitBurst}} nodelay;
+    {{end}}
 
     # SSL Configuration
     ssl_certificate /etc/nginx/ssl/certificates/{{.SSLCertificateID}}/cert.pem;
@@ -151,23 +173,66 @@ server {
     ssl_session_tickets off;
     
     # OCSP Stapling
-    ssl_stapling on;
+    {{if .OCSPStaplingEnabled}}ssl_stapling on;
     ssl_stapling_verify on;
     resolver 8.8.8.8 8.8.4.4 valid=300s;
     resolver_timeout 5s;
+    {{else}}# OCSP Stapling disabled (self-signed or missing issuer)
+    # ssl_stapling off;
+    {{end}}
     
+    # Performance & Security Settings
+    {{if .HideServerTokens}}server_tokens off;{{else}}server_tokens on;{{end}}
+    {{if .BrotliEnabled}}brotli on;
+    brotli_comp_level 6;
+    brotli_static on;{{end}}
+
     # Security Headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
+    {{if .HSTSEnabled}}add_header Strict-Transport-Security "max-age={{.HSTSMaxAge}}{{if .HSTSIncludeSubdomains}}; includeSubDomains{{end}}{{if .HSTSPreload}}; preload{{end}}" always;{{end}}
+    {{if .SecurityHeadersEnabled}}add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    {{if .HSTSEnabled}}# HSTS is enabled via Strict-Transport-Security above{{end}}{{end}}
     add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://www.google.com https://www.gstatic.com; frame-src 'self' https://challenges.cloudflare.com https://www.google.com; connect-src 'self' https://challenges.cloudflare.com https://www.google.com" always;
     {{end}}
 
     # Access and Error Logs
     access_log /var/log/nginx/{{.Domain}}_access.log;
     error_log /var/log/nginx/{{.Domain}}_error.log warn;
+    
+    # IP Access Control
+    {{range .IPRules}}{{.Action}} {{.Address}};
+    {{end}}
+    
+    # Custom Error Pages for 403 (IP/Region Block)
+    error_page 403 /access-restricted.html;
+    location = /access-restricted.html {
+        root /usr/share/nginx/html;
+        allow all;
+        internal;
+        sub_filter '{{ "{{" }}IP_ADDRESS{{ "}}" }}' '$remote_addr';
+        sub_filter '{{ "{{" }}DOMAIN_NAME{{ "}}" }}' '$host';
+        sub_filter_once on;
+    }
+    
+    # Region Filtering
+    {{if and .RegionFilteringEnabled .GeoIPAvailable}}
+    {{if .RegionWhitelist}}
+    # Whitelist: Allow only listed countries
+    set $allow_country no;
+    {{range .RegionWhitelist}}if ($geoip2_data_country_code = "{{.}}") { set $allow_country yes; }
+    {{end}}
+    if ($allow_country = no) { return 403; }
+    {{else if .RegionBlacklist}}
+    # Blacklist: Block listed countries
+    {{range .RegionBlacklist}}if ($geoip2_data_country_code = "{{.}}") { return 403; }
+    {{end}}
+    {{end}}
+    {{else if .RegionFilteringEnabled}}
+    # Region Filtering enabled but GeoIP database is MISSING
+    # add_header X-WAF-Warning "GeoIP database not found" always;
+    {{end}}
     
     # Per-VHost Upload Size Limit
     client_max_body_size {{.MaxUploadSize}}m;
@@ -217,8 +282,7 @@ server {
     {{if not (hasAPILocation .CustomLocations)}}
     # Rate Limiting for API endpoints
     location ~* ^/api/ {
-        {{if eq .DefenseMode "defense"}}limit_req zone=api burst=200 nodelay;
-        limit_req_status 429;{{end}}
+        {{if .RateLimitEnabled}}limit_req zone=rate_{{sanitizeDomainForUpstream $.Domain}} burst={{$.RateLimitBurst}} nodelay;{{end}}
         
         proxy_pass http://waf:8080;
         proxy_set_header Host $host;
@@ -254,8 +318,8 @@ server {
     # Proxy to WAF - All requests go through WAF middleware first
     # Request Handling based on VHost Type
     location / {
-        {{if eq .DefenseMode "defense"}}# Rate limiting
-        limit_req zone=general burst=100 nodelay;{{end}}
+        {{if .RateLimitEnabled}}# Rate Limiting
+        limit_req zone=rate_{{sanitizeDomainForUpstream $.Domain}} burst={{$.RateLimitBurst}} nodelay;{{end}}
         
         {{if eq .Type "dead"}}
         # Return 404 for dead hosts
@@ -311,6 +375,7 @@ func (s *NginxConfigService) GenerateVHostConfigContent(data *VHostWithLocations
 			}
 			return false
 		},
+		"sanitizeDomainForUpstream": sanitizeDomainForUpstream,
 	}
 
 	tmpl, err := template.New("vhost").Funcs(funcMap).Parse(VHostTemplate)
@@ -327,77 +392,22 @@ func (s *NginxConfigService) GenerateVHostConfigContent(data *VHostWithLocations
 
 // GenerateVHostConfig generates nginx configuration for a virtual host
 func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
-	// Prepare vhost with locations
-	upstreamName := sanitizeDomainForUpstream(vhost.Domain)
-	// If there are additional backends, prepend backend_url to form the full upstream
-	allBackends := []string{}
-	for _, b := range vhost.Backends {
-		allBackends = append(allBackends, stripProtocol(b))
-	}
-	if len(allBackends) > 0 && vhost.BackendURL != "" {
-		allBackends = append([]string{stripProtocol(vhost.BackendURL)}, allBackends...)
-	}
+	vhostWithLocs := s.prepareVHostWithLocations(vhost)
 
-	vhostWithLocs := &VHostWithLocations{
-		VHost:           vhost,
-		CustomLocations: []CustomLocation{},
-		UpstreamName:    upstreamName,
-		HasUpstream:     len(allBackends) > 0,
-	}
-	// Override backends with the full list including backend_url
-	vhostWithLocs.Backends = allBackends
-
-	// Fetch custom locations from database if db is available
 	if s.db != nil {
-		var locations []struct {
-			ID                string  `db:"id"`
-			Path              string  `db:"path"`
-			ProxyPass         string  `db:"proxy_pass"`
-			CustomConfig      string  `db:"custom_config"`
-			WebSocketEnabled  bool    `db:"websocket_enabled"`
-			Backends          *string `db:"backends"`
-			LoadBalanceMethod *string `db:"load_balance_method"`
-		}
+		s.fetchCustomLocations(vhost.ID, vhostWithLocs)
+		s.fetchIPRules(vhost.ID, vhostWithLocs)
 
-		query := `
-			SELECT id, path, COALESCE(proxy_pass, '') as proxy_pass, COALESCE(custom_config, '') as custom_config, 
-				   COALESCE(websocket_enabled, false) as websocket_enabled,
-				   backends::text as backends, COALESCE(load_balance_method, 'round_robin') as load_balance_method
-			FROM vhost_locations
-			WHERE vhost_id = $1 AND enabled = true
-			ORDER BY length(path) DESC
-		`
-
-		if err := s.db.Select(&locations, query, vhost.ID); err == nil {
-			for _, loc := range locations {
-				customLoc := CustomLocation{
-					Path:              loc.Path,
-					ProxyPass:         loc.ProxyPass,
-					CustomConfig:      loc.CustomConfig,
-					WebSocketEnabled:  loc.WebSocketEnabled,
-					LoadBalanceMethod: "round_robin",
+		// Check if OCSP Stapling should be enabled
+		if vhost.SSLCertificateID != "" {
+			var cert models.Certificate
+			err := s.db.Get(&cert, "SELECT issuer, common_name FROM certificates WHERE id = $1", vhost.SSLCertificateID)
+			if err == nil {
+				// Enable OCSP stapling only if it's not self-signed
+				// Basic check: issuer != common_name and issuer is not empty/localhost
+				if cert.Issuer != "" && cert.Issuer != cert.CommonName && cert.Issuer != "localhost" {
+					vhostWithLocs.OCSPStaplingEnabled = true
 				}
-
-				// Parse backends from JSON if present
-				if loc.Backends != nil && *loc.Backends != "" && *loc.Backends != "[]" {
-					var backends []string
-					if err := parseJSONBackends(*loc.Backends, &backends); err == nil && len(backends) > 0 {
-						// Strip protocol from each backend
-						strippedBackends := make([]string, 0, len(backends))
-						for _, b := range backends {
-							strippedBackends = append(strippedBackends, stripProtocol(b))
-						}
-						customLoc.Backends = strippedBackends
-						customLoc.HasUpstream = true
-						customLoc.UpstreamName = upstreamName + "_loc_" + sanitizePath(loc.Path)
-					}
-				}
-
-				if loc.LoadBalanceMethod != nil {
-					customLoc.LoadBalanceMethod = *loc.LoadBalanceMethod
-				}
-
-				vhostWithLocs.CustomLocations = append(vhostWithLocs.CustomLocations, customLoc)
 			}
 		}
 	}
@@ -407,13 +417,185 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 		return err
 	}
 
-	// Create config directory if not exists
+	return s.writeVHostConfigToFile(vhost.Domain, content)
+}
+
+func (s *NginxConfigService) prepareVHostWithLocations(vhost *models.VHost) *VHostWithLocations {
+	upstreamName := sanitizeDomainForUpstream(vhost.Domain)
+	allBackends := []string{}
+	for _, b := range vhost.Backends {
+		allBackends = append(allBackends, stripProtocol(b))
+	}
+	if len(allBackends) > 0 && vhost.BackendURL != "" {
+		allBackends = append([]string{stripProtocol(vhost.BackendURL)}, allBackends...)
+	}
+
+	// Update the actual vhost backends
+	vhost.Backends = allBackends
+
+	// Calculate Nginx rate and burst
+	rate := "10r/s"
+	burst := 100
+	if vhost.RateLimitEnabled {
+		rate = calculateNginxRate(vhost.RateLimitRequests, vhost.RateLimitWindow)
+		burst = vhost.RateLimitRequests
+	}
+
+	// Check if GeoIP database exists
+	geoIPAvailable := false
+	if _, err := os.Stat("/etc/nginx/geoip/GeoLite2-Country.mmdb"); err == nil {
+		geoIPAvailable = true
+	} else if _, err := os.Stat("./data/nginx/geoip/GeoLite2-Country.mmdb"); err == nil {
+		geoIPAvailable = true
+	}
+
+	return &VHostWithLocations{
+		VHost:           vhost,
+		CustomLocations: []CustomLocation{},
+		IPRules:         []IPRule{},
+		UpstreamName:    upstreamName,
+		HasUpstream:     len(allBackends) > 0,
+		RateLimitRate:   rate,
+		RateLimitBurst:  burst,
+		GeoIPAvailable:  geoIPAvailable,
+	}
+}
+
+// calculateNginxRate converts requests and window into nginx rate string (r/s or r/m)
+func calculateNginxRate(requests, window int) string {
+	if window <= 0 {
+		window = 60
+	}
+	if requests <= 0 {
+		requests = 100
+	}
+
+	// If window is exactly 1s or less, use r/s
+	if window == 1 {
+		return fmt.Sprintf("%dr/s", requests)
+	}
+
+	// Calculate per-minute rate for better precision in nginx
+	// Nginx supports r/s and r/m
+	rpm := (requests * 60) / window
+	if rpm < 1 {
+		rpm = 1 // Minimum 1r/m supported by Nginx
+	}
+
+	// If RPM is high enough to be clean per second, use r/s
+	if rpm >= 60 && rpm%60 == 0 {
+		return fmt.Sprintf("%dr/s", rpm/60)
+	}
+
+	return fmt.Sprintf("%dr/m", rpm)
+}
+
+func (s *NginxConfigService) fetchCustomLocations(vhostID string, vhostWithLocs *VHostWithLocations) {
+	var locations []struct {
+		ID                string  `db:"id"`
+		Path              string  `db:"path"`
+		ProxyPass         string  `db:"proxy_pass"`
+		CustomConfig      string  `db:"custom_config"`
+		WebSocketEnabled  bool    `db:"websocket_enabled"`
+		Backends          *string `db:"backends"`
+		LoadBalanceMethod *string `db:"load_balance_method"`
+	}
+
+	query := `
+		SELECT id, path, COALESCE(proxy_pass, '') as proxy_pass, COALESCE(custom_config, '') as custom_config, 
+			   COALESCE(websocket_enabled, false) as websocket_enabled,
+			   backends::text as backends, COALESCE(load_balance_method, 'round_robin') as load_balance_method
+		FROM vhost_locations
+		WHERE vhost_id = $1 AND enabled = true
+		ORDER BY length(path) DESC
+	`
+
+	if err := s.db.Select(&locations, query, vhostID); err != nil {
+		return
+	}
+
+	for _, loc := range locations {
+		customLoc := CustomLocation{
+			Path:              loc.Path,
+			ProxyPass:         loc.ProxyPass,
+			CustomConfig:      loc.CustomConfig,
+			WebSocketEnabled:  loc.WebSocketEnabled,
+			LoadBalanceMethod: "round_robin",
+		}
+
+		if loc.Backends != nil && *loc.Backends != "" && *loc.Backends != "[]" {
+			var backends []string
+			if err := parseJSONBackends(*loc.Backends, &backends); err == nil && len(backends) > 0 {
+				strippedBackends := make([]string, 0, len(backends))
+				for _, b := range backends {
+					strippedBackends = append(strippedBackends, stripProtocol(b))
+				}
+				customLoc.Backends = strippedBackends
+				customLoc.HasUpstream = true
+				customLoc.UpstreamName = vhostWithLocs.UpstreamName + "_loc_" + sanitizePath(loc.Path)
+			}
+		}
+
+		if loc.LoadBalanceMethod != nil {
+			customLoc.LoadBalanceMethod = *loc.LoadBalanceMethod
+		}
+
+		vhostWithLocs.CustomLocations = append(vhostWithLocs.CustomLocations, customLoc)
+	}
+}
+
+func (s *NginxConfigService) fetchIPRules(vhostID string, vhostWithLocs *VHostWithLocations) {
+	var ipRules []struct {
+		Address string `db:"ip_address"`
+		Mask    *int   `db:"cidr_mask"`
+		Type    string `db:"type"`
+	}
+
+	ipQuery := `
+		SELECT ia.ip_address, ia.cidr_mask, ig.type
+		FROM ip_addresses ia
+		JOIN ip_groups ig ON ia.group_id = ig.id
+		JOIN ip_group_vhosts igv ON ig.id = igv.ip_group_id
+		WHERE igv.vhost_id = $1
+	`
+
+	if err := s.db.Select(&ipRules, ipQuery, vhostID); err != nil {
+		return
+	}
+
+	hasWhitelist := false
+	for _, rule := range ipRules {
+		addr := rule.Address
+		if rule.Mask != nil {
+			addr = fmt.Sprintf("%s/%d", addr, *rule.Mask)
+		}
+
+		action := "deny"
+		if rule.Type == "whitelist" {
+			action = "allow"
+			hasWhitelist = true
+		}
+
+		vhostWithLocs.IPRules = append(vhostWithLocs.IPRules, IPRule{
+			Address: addr,
+			Action:  action,
+		})
+	}
+
+	if hasWhitelist {
+		vhostWithLocs.IPRules = append(vhostWithLocs.IPRules, IPRule{
+			Address: "all",
+			Action:  "deny",
+		})
+	}
+}
+
+func (s *NginxConfigService) writeVHostConfigToFile(domain, content string) error {
 	if err := os.MkdirAll(constants.NginxConfigDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Create config file
-	configPath := filepath.Join(constants.NginxConfigDir, fmt.Sprintf("%s.conf", vhost.Domain))
+	configPath := filepath.Join(constants.NginxConfigDir, fmt.Sprintf("%s.conf", domain))
 	file, err := os.Create(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)

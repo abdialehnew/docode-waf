@@ -662,3 +662,32 @@ ALTER TABLE rules ADD COLUMN IF NOT EXISTS match_logic VARCHAR(10) DEFAULT 'AND'
 -- Description: Adds a defense_mode column to configure the WAF behavior for each vhost
 
 ALTER TABLE vhosts ADD COLUMN IF NOT EXISTS defense_mode VARCHAR(20) DEFAULT 'defense';
+
+
+-- Source: 017_add_vhost_caching.sql
+-- Migration: Add caching support to vhosts
+-- Description: Adds columns for configuring caching behavior per vhost
+
+ALTER TABLE vhosts 
+ADD COLUMN IF NOT EXISTS cache_enabled BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS cache_ttl INTEGER DEFAULT 60,
+ADD COLUMN IF NOT EXISTS cache_methods TEXT[] DEFAULT '{"GET"}',
+ADD COLUMN IF NOT EXISTS cache_ignore_headers BOOLEAN DEFAULT false;
+
+COMMENT ON COLUMN vhosts.cache_enabled IS 'Enable or disable caching for this vhost';
+COMMENT ON COLUMN vhosts.cache_ttl IS 'Cache time-to-live in seconds';
+COMMENT ON COLUMN vhosts.cache_methods IS 'HTTP methods to cache (e.g., ["GET", "HEAD"])';
+COMMENT ON COLUMN vhosts.cache_ignore_headers IS 'Ignore Vary, Cache-Control, and Expires headers from backend';
+
+
+-- Source: 018_add_advanced_security_performance.sql
+-- Migration: Add advanced security and performance fields to vhosts
+-- Description: Adds columns for HSTS, Brotli, HTTP/3, and Server Tokens
+
+ALTER TABLE vhosts 
+ADD COLUMN IF NOT EXISTS hsts_include_subdomains BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS hsts_preload BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS brotli_enabled BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS http3_enabled BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS hide_server_tokens BOOLEAN DEFAULT true;
+

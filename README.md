@@ -58,8 +58,12 @@ This project is committed to maintaining high security and code quality standard
   - **Whitelist Mode** - Allow ONLY specified countries (e.g., US, GB, ID)
   - **Blacklist Mode** - Block specific countries (e.g., CN, RU, KP)
   - **ISO 3166-1 Alpha-2** - Standard country codes (2-letter)
-  - **ip-api.com Integration** - Free GeoIP lookup (45 requests/minute)
-  - **Custom Blocked Page** - Beautiful gradient page with country info
+  - **MaxMind GeoLite2** - Offline database for high performance and privacy
+  - **Dynamic Nginx Module** - Compiled `ngx_http_geoip2_module` for real-time lookups
+- ✅ **Custom Error Pages** - Modern "Akses Terbatas" (Access Restricted) page for 403 errors:
+  - **Indonesian Language** - Clear and informative Indonesian text
+  - **Dynamic Data** - Shows visitor IP and requested domain using Nginx `sub_filter`
+  - **Premium Design** - High-quality aesthetic matching the WAF brand
 - ✅ **URL Filtering** - Pattern-based URL blocking
 - ✅ **SSL Certificate Management** - Upload, **generate (Let's Encrypt)**, and manage SSL certificates per domain
   - **Wildcard Support** - Generate `*.example.com` certificates using Cloudflare DNS-01 challenge
@@ -176,10 +180,15 @@ docode-waf/
 │   │   │   └── api.js          # API client
 │   │   └── App.jsx
 │   └── package.json
-├── migrations/                  # Database migrations
+├── nginx/                       # Nginx Proxy configuration
+│   ├── html/                    # Custom static assets (error pages)
+│   │   └── access-restricted.html # Premium 403 Access Restricted page
+│   ├── Dockerfile               # Custom Nginx build with Brotli & GeoIP2
+│   ├── nginx.conf               # Global Nginx configuration
+│   └── entrypoint.sh            # Dynamic module & config setup
+├── migrations/                  # Database migrations (PostgreSQL)
 ├── docker-compose.yaml          # Docker orchestration
-├── Dockerfile                   # WAF backend container
-├── GeoLite2-Country.mmdb       # GeoIP database
+├── GeoLite2-Country.mmdb       # GeoIP database (MaxMind)
 └── config.yaml                  # Configuration file
 ```
 
@@ -193,8 +202,8 @@ docode-waf/
 - **Database**: PostgreSQL 15
 - **Cache**: Redis 7.4
 - **Authentication**: JWT
-- **Proxy**: Nginx
-- **GeoIP**: MaxMind GeoLite2
+- **Proxy**: Nginx (Custom build)
+- **GeoIP**: MaxMind GeoLite2 (via `ngx_http_geoip2_module`)
 - **ACME**: go-acme/lego (Let's Encrypt)
 
 ### Frontend
