@@ -114,10 +114,19 @@ func (s *CertificateService) CreateCertificate(input *models.CertificateInput) (
 	// Determine status
 	status := s.GetStatus(cert.NotBefore, cert.NotAfter)
 
-	// Insert into database
+	// Insert into database or update if exists
 	query := `
 		INSERT INTO certificates (name, cert_content, key_content, common_name, issuer, valid_from, valid_to, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (name) DO UPDATE SET
+			cert_content = EXCLUDED.cert_content,
+			key_content = EXCLUDED.key_content,
+			common_name = EXCLUDED.common_name,
+			issuer = EXCLUDED.issuer,
+			valid_from = EXCLUDED.valid_from,
+			valid_to = EXCLUDED.valid_to,
+			status = EXCLUDED.status,
+			updated_at = CURRENT_TIMESTAMP
 		RETURNING id, created_at, updated_at
 	`
 

@@ -81,7 +81,16 @@ func (s *VHostService) ListVHosts() ([]*models.VHost, error) {
 	query := `
 		SELECT v.id::text as id, v.name, v.domain, v.backend_url, v.ssl_enabled, 
 		       v.ssl_certificate_id::text as ssl_certificate_id, 
-		       v.ssl_cert_path, v.ssl_key_path, v.enabled, v.created_at, v.updated_at
+		       v.ssl_cert_path, v.ssl_key_path, v.enabled, v.created_at, v.updated_at,
+               COALESCE(v.type, 'proxy') as type, COALESCE(v.custom_config, '') as custom_config,
+               COALESCE(v.load_balance_method, 'round_robin') as load_balance_method,
+               COALESCE(v.defense_mode, 'defense') as defense_mode, v.max_upload_size, v.proxy_read_timeout, v.proxy_connect_timeout,
+               v.bot_detection_enabled, v.bot_detection_type, v.recaptcha_version,
+               v.rate_limit_enabled, v.rate_limit_requests, v.rate_limit_window,
+               COALESCE(v.region_whitelist, '{}') as region_whitelist, COALESCE(v.region_blacklist, '{}') as region_blacklist,
+               v.cache_enabled, v.cache_ttl, COALESCE(v.cache_methods, '{}') as cache_methods, v.cache_ignore_headers,
+               v.hsts_enabled, v.hsts_max_age, v.hsts_include_subdomains, v.hsts_preload,
+               v.brotli_enabled, v.http3_enabled, v.hide_server_tokens, v.security_headers_enabled
 		FROM vhosts v
 		WHERE v.enabled = true
 		ORDER BY v.created_at DESC
@@ -102,7 +111,16 @@ func (s *VHostService) GetVHostByID(id string) (*models.VHost, error) {
 	query := `
 		SELECT v.id::text as id, v.name, v.domain, v.backend_url, v.ssl_enabled, 
 		       v.ssl_certificate_id::text as ssl_certificate_id,
-		       v.ssl_cert_path, v.ssl_key_path, v.enabled, v.created_at, v.updated_at
+		       v.ssl_cert_path, v.ssl_key_path, v.enabled, v.created_at, v.updated_at,
+               COALESCE(v.type, 'proxy') as type, COALESCE(v.custom_config, '') as custom_config,
+               COALESCE(v.load_balance_method, 'round_robin') as load_balance_method,
+               COALESCE(v.defense_mode, 'defense') as defense_mode, v.max_upload_size, v.proxy_read_timeout, v.proxy_connect_timeout,
+               v.bot_detection_enabled, v.bot_detection_type, v.recaptcha_version,
+               v.rate_limit_enabled, v.rate_limit_requests, v.rate_limit_window,
+               COALESCE(v.region_whitelist, '{}') as region_whitelist, COALESCE(v.region_blacklist, '{}') as region_blacklist,
+               v.cache_enabled, v.cache_ttl, COALESCE(v.cache_methods, '{}') as cache_methods, v.cache_ignore_headers,
+               v.hsts_enabled, v.hsts_max_age, v.hsts_include_subdomains, v.hsts_preload,
+               v.brotli_enabled, v.http3_enabled, v.hide_server_tokens, v.security_headers_enabled
 		FROM vhosts v
 		WHERE v.id = $1
 	`

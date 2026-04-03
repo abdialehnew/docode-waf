@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Akses Terbatas - DoCode WAF</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-dark: #4f46e5;
+            --bg-color: #6366f1;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --accent-bg: #f9fafb;
+            --info-bg: #eff6ff;
+            --info-border: #3b82f6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 560px;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 48px 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .icon-wrapper {
+            margin-bottom: 32px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .shield-icon {
+            width: 80px;
+            height: 80px;
+            background: #f5f3ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-color);
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+
+        .description {
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        .data-box {
+            background: var(--accent-bg);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 32px;
+            text-align: left;
+            border: 1px solid #f3f4f6;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .data-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .label {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .value {
+            font-weight: 700;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+        .info-alert {
+            background: var(--info-bg);
+            border-left: 4px solid var(--info-border);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #1e40af;
+        }
+
+        .info-alert strong {
+            color: #1e3a8a;
+        }
+
+        .footer {
+            margin-top: 32px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 500;
+        }
+
+        @media (max-width: 480px) {
+            .card {
+                padding: 32px 24px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="icon-wrapper">
+                <div class="shield-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <rect x="9" y="10" width="6" height="5" rx="1"></rect>
+                        <path d="M12 10v2"></path>
+                    </svg>
+                </div>
+            </div>
+            <h1>Akses Terbatas</h1>
+            <p class="description">
+                Untuk mengakses halaman ini memerlukan otorisasi <strong>daftar putih (whitelist) IP</strong>. 
+                Alamat IP Anda tidak terdaftar dalam daftar yang diizinkan.
+            </p>
+
+            <div class="data-box">
+                <div class="data-row">
+                    <span class="label">Alamat IP Anda</span>
+                    <span class="value">{{IP_ADDRESS}}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">Domain yang Diminta</span>
+                    <span class="value">{{DOMAIN_NAME}}</span>
+                </div>
+            </div>
+
+            <div class="info-alert">
+                Domain ini menggunakan kontrol akses <strong>Daftar Putih (whitelist) IP</strong>. Hanya alamat IP yang telah disetujui sebelumnya yang dapat mengakses sumber daya ini. Silakan hubungi Administrator Sistem Anda untuk meminta akses.
+            </div>
+        </div>
+        <div class="footer" style="text-align: center;">
+            Dilindungi oleh <strong>DoCode WAF</strong>
+        </div>
+    </div>
+</body>
+</html>

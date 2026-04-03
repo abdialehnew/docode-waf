@@ -1,0 +1,201 @@
+package services
+
+import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/go-acme/lego/v4/certcrypto"
+	"github.com/go-acme/lego/v4/certificate"
+	"github.com/go-acme/lego/v4/lego"
+	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
+	"github.com/go-acme/lego/v4/registration"
+)
+
+// MyUser represents a user for Let's Encrypt
+type MyUser struct {
+	Email        string
+	Registration *registration.Resource
+	key          crypto.PrivateKey
+}
+
+func (u *MyUser) GetEmail() string {
+	return u.Email
+}
+func (u *MyUser) GetRegistration() *registration.Resource {
+	return u.Registration
+}
+func (u *MyUser) GetPrivateKey() crypto.PrivateKey {
+	return u.key
+}
+
+// InMemoryHTTPProvider implements http01.Provider
+type InMemoryHTTPProvider struct {
+	tokens map[string]string
+	mu     sync.RWMutex
+}
+
+func NewInMemoryHTTPProvider() *InMemoryHTTPProvider {
+	return &InMemoryHTTPProvider{
+		tokens: make(map[string]string),
+	}
+}
+
+func (p *InMemoryHTTPProvider) Present(domain, token, keyAuth string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.tokens[token] = keyAuth
+	log.Printf("[ACME] Presenting challenge for domain %s with token %s", domain, token)
+	return nil
+}
+
+func (p *InMemoryHTTPProvider) CleanUp(domain, token, keyAuth string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.tokens, token)
+	log.Printf("[ACME] Cleaning up challenge for domain %s", domain)
+	return nil
+}
+
+// GetKeyAuth returns the key auth for a given token
+func (p *InMemoryHTTPProvider) GetKeyAuth(token string) (string, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	val, ok := p.tokens[token]
+	return val, ok
+}
+
+type ACMEService struct {
+	httpProvider *InMemoryHTTPProvider
+}
+
+func NewACMEService() *ACMEService {
+	return &ACMEService{
+		httpProvider: NewInMemoryHTTPProvider(),
+	}
+}
+
+func (s *ACMEService) GetHTTPProvider() *InMemoryHTTPProvider {
+	return s.httpProvider
+}
+
+func (s *ACMEService) ObtainCertificate(domain, email string, provider string, credentials map[string]string) (*certificate.Resource, error) {
+	// Create a user. In a real application, you'd want to persist the user/private key.
+	// For now, we generate a new one for each request (ephemeral user).
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate private key: %w", err)
+	}
+
+	user := &MyUser{
+		Email: email,
+		key:   privateKey,
+	}
+
+	config := lego.NewConfig(user)
+
+	// Use Staging CA for testing/dev, Production for prod.
+	// TODO: Make this configurable
+	config.CADirURL = lego.LEDirectoryProduction
+	config.Certificate.KeyType = certcrypto.EC256
+
+	client, err := lego.NewClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lego client: %w", err)
+	}
+
+	// Register
+	reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register user: %w", err)
+	}
+	user.Registration = reg
+
+	// Set Challenge Provider
+	if provider == "cloudflare" {
+		apiToken, ok := credentials["cloudflare_api_token"]
+		if !ok || apiToken == "" {
+			return nil, fmt.Errorf("cloudflare API token is required")
+		}
+
+		cfConfig := cloudflare.NewDefaultConfig()
+		cfConfig.AuthToken = apiToken
+
+		dnsProvider, err := cloudflare.NewDNSProviderConfig(cfConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cloudflare DNS provider: %w", err)
+		}
+
+		if err := client.Challenge.SetDNS01Provider(dnsProvider); err != nil {
+			return nil, fmt.Errorf("failed to set DNS-01 provider: %w", err)
+		}
+		log.Printf("[ACME] Using Cloudflare DNS-01 provider for domain %s", domain)
+	} else {
+		// Default to HTTP-01
+		err = client.Challenge.SetHTTP01Provider(s.httpProvider)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set HTTP-01 provider: %w", err)
+		}
+		log.Printf("[ACME] Using HTTP-01 provider for domain %s", domain)
+	}
+
+	request := certificate.ObtainRequest{
+		Domains: []string{domain},
+		Bundle:  true,
+	}
+
+	log.Printf("[ACME] Requesting certificate for %s", domain)
+	certificates, err := client.Certificate.Obtain(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain certificate: %w", err)
+	}
+	log.Printf("[ACME] Successfully obtained certificate for %s", domain)
+
+	return certificates, nil
+}
+
+// VerifyCloudflareToken verifies if the Cloudflare API token is valid
+func (s *ACMEService) VerifyCloudflareToken(token string) error {
+	req, err := http.NewRequest("GET", "https://api.cloudflare.com/client/v4/user/tokens/verify", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to verify token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("invalid token (status: %d)", resp.StatusCode)
+	}
+
+	var result struct {
+		Success bool `json:"success"`
+		Result  struct {
+			Status string `json:"status"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !result.Success || result.Result.Status != "active" {
+		return fmt.Errorf("token is not active")
+	}
+
+	return nil
+}

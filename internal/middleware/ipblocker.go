@@ -11,24 +11,35 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// GetRealClientIP extracts the real client IP from proxy headers
+// This is essential when running behind nginx or other reverse proxies
+func GetRealClientIP(c *gin.Context) string {
+	// Try to get real client IP from X-Forwarded-For or X-Real-IP headers
+	clientIP := c.ClientIP()
+	xForwardedFor := c.GetHeader("X-Forwarded-For")
+	xRealIP := c.GetHeader("X-Real-IP")
+
+	// Use X-Real-IP if available (set by nginx/proxy)
+	if xRealIP != "" {
+		clientIP = xRealIP
+	} else if xForwardedFor != "" {
+		// X-Forwarded-For can contain multiple IPs, take the first one
+		ips := strings.Split(xForwardedFor, ",")
+		if len(ips) > 0 {
+			clientIP = strings.TrimSpace(ips[0])
+		}
+	}
+
+	return clientIP
+}
+
 // IPBlockerMiddleware blocks requests from blacklisted IPs and allows only whitelisted IPs
 func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Try to get real client IP from X-Forwarded-For or X-Real-IP headers
-		clientIP := c.ClientIP()
+		// Get real client IP using helper function
+		clientIP := GetRealClientIP(c)
 		xForwardedFor := c.GetHeader("X-Forwarded-For")
 		xRealIP := c.GetHeader("X-Real-IP")
-
-		// Use X-Real-IP if available (set by nginx/proxy)
-		if xRealIP != "" {
-			clientIP = xRealIP
-		} else if xForwardedFor != "" {
-			// X-Forwarded-For can contain multiple IPs, take the first one
-			ips := strings.Split(xForwardedFor, ",")
-			if len(ips) > 0 {
-				clientIP = strings.TrimSpace(ips[0])
-			}
-		}
 
 		// Get current vhost domain
 		domain := c.Request.Host
@@ -58,6 +69,10 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 		// If vhost has an active whitelist and IP is not in it, block the request
 		if hasWhitelist {
 			log.Printf("[IP Blocker] IP %s is NOT in whitelist for domain %s - blocking request (whitelist mode)", clientIP, domain)
+			if c.GetString("defense_mode") == "audited" {
+				c.Next()
+				return
+			}
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.String(http.StatusForbidden, getWhitelistBlockedPageHTML(clientIP, domain))
 			c.Abort()
@@ -68,6 +83,10 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 		blacklisted, err := isIPInGroup(db, clientIP, domain, "blacklist")
 		if err == nil && blacklisted {
 			log.Printf("[IP Blocker] IP %s is blacklisted for domain %s - blocking request", clientIP, domain)
+			if c.GetString("defense_mode") == "audited" {
+				c.Next()
+				return
+			}
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.String(http.StatusForbidden, getBlockedPageHTML(db, clientIP, c.Request.Host))
 			c.Abort()
@@ -77,6 +96,11 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 		// Check blocking rules
 		blocked, reason := checkBlockingRules(db, c)
 		if blocked {
+			log.Printf("[IP Blocker] Request blocked by rules for IP %s: %s", clientIP, reason)
+			if c.GetString("defense_mode") == "audited" {
+				c.Next()
+				return
+			}
 			c.JSON(http.StatusForbidden, gin.H{
 				"error": reason,
 			})

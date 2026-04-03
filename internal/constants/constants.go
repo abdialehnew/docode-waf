@@ -27,3 +27,9 @@ const (
 	ErrBlockingRuleNotFound  = "Blocking rule not found"
 	ErrRateLimitRuleNotFound = "Rate limit rule not found"
 )
+
+// Default configuration constants
+const (
+	DefaultHTTPVersion       = "http/1.1"
+	DefaultLoadBalanceMethod = "round_robin"
+)

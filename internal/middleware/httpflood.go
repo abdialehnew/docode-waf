@@ -13,7 +13,7 @@ import (
 // HTTPFloodProtectionMiddleware protects against HTTP flood attacks
 func HTTPFloodProtectionMiddleware(redisClient *redis.Client, maxRequests int, window time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		clientIP := c.ClientIP()
+		clientIP := GetRealClientIP(c)
 		key := fmt.Sprintf("httpflood:%s", clientIP)
 		ctx := context.Background()
 

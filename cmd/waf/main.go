@@ -100,7 +100,7 @@ func setupVHostsAndCerts(vhostService *services.VHostService, certService *servi
 	}
 }
 
-func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, reverseProxyHandler http.Handler) *http.Server {
+func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, reverseProxyHandler http.Handler, dynamicBanService *services.DynamicBanService, notificationService *services.NotificationService, ruleService *services.RuleService) *http.Server {
 	gin.SetMode(gin.ReleaseMode)
 	wafRouter := gin.New()
 	wafRouter.Use(gin.Recovery())
@@ -108,15 +108,25 @@ func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, 
 	// Initialize GeoIP service
 	geoIPService := services.NewGeoIPService()
 
+	// Initialize Rule Executor
+	ruleExecutor := middleware.NewRuleExecutor(ruleService)
+
 	// Apply WAF middleware
+	wafRouter.Use(middleware.DefenseModeMiddleware(db))                                     // Evaluate Defense/Audited/Offline mode
+	wafRouter.Use(ruleExecutor.Execute())                                                   // Custom visual rules first
+	wafRouter.Use(middleware.DynamicBanMiddleware(dynamicBanService))                       // Check for dynamic bans first
+	wafRouter.Use(middleware.LoggingMiddleware(db, dynamicBanService, notificationService)) // Log traffic and count violations (must be before blocking middleware)
+	wafRouter.Use(middleware.SecurityHeadersMiddleware(db))                                 // Security headers
 	wafRouter.Use(middleware.RateLimiterMiddleware(redisClient, db))
 	wafRouter.Use(middleware.HTTPFloodProtectionMiddleware(redisClient, cfg.WAF.HTTPFlood.MaxRequestsPerMinute, time.Minute))
 	wafRouter.Use(middleware.IPBlockerMiddleware(db))
 	wafRouter.Use(middleware.RegionFilter(db, geoIPService))
+	wafRouter.Use(middleware.OWASPProtectionMiddleware(db))         // OWASP Top 10 protection
+	wafRouter.Use(middleware.BruteForceMiddleware(redisClient, db)) // Brute force protection
 	wafRouter.Use(middleware.BotDetectorMiddleware(db))
-	wafRouter.Use(middleware.LoggingMiddleware(db))
 
 	// Proxy all requests to the reverse proxy
+
 	wafRouter.NoRoute(gin.WrapH(reverseProxyHandler))
 
 	// Create server
@@ -140,7 +150,8 @@ func setupWAFServer(cfg *config.Config, redisClient *redis.Client, db *sqlx.DB, 
 func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, authHandler *api.AuthHandler,
 	dashboardHandler *api.DashboardHandler, vhostHandler *api.VHostHandler,
 	ipGroupHandler *api.IPGroupHandler, certHandler *api.CertificateHandler, settingsHandler *api.SettingsHandler,
-	blockingHandler *api.BlockingRuleHandler, rateLimitHandler *api.RateLimitHandler, logsHandler *api.LogsHandler, cfg *config.Config) {
+	blockingHandler *api.BlockingRuleHandler, rateLimitHandler *api.RateLimitHandler, logsHandler *api.LogsHandler,
+	trafficFiltersHandler *api.TrafficFiltersHandler, bansHandler *api.BansHandler, notificationsHandler *api.NotificationsHandler, rulesHandler *api.RulesHandler, reportsHandler *api.ReportsHandler, cfg *config.Config) {
 
 	// Public Auth routes (no authentication required)
 	auth := apiV1.Group("/auth")
@@ -175,10 +186,15 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		protected.GET("/dashboard/recent-attacks", dashboardHandler.GetRecentAttacks)
 		protected.GET("/dashboard/attacks-by-country", dashboardHandler.GetAttacksByCountry)
 
+		// Traffic Filters
+		protected.GET("/traffic/countries", trafficFiltersHandler.GetUniqueCountries)
+		protected.GET("/traffic/ips", trafficFiltersHandler.GetUniqueIPs)
+
 		// Virtual Hosts
 		protected.GET("/vhosts", vhostHandler.ListVHosts)
 		protected.GET(constants.RouteVHostID, vhostHandler.GetVHost)
 		protected.POST("/vhosts", vhostHandler.CreateVHost)
+		protected.POST("/vhosts/preview", vhostHandler.PreviewVHostConfig)
 		protected.PUT(constants.RouteVHostID, vhostHandler.UpdateVHost)
 		protected.DELETE(constants.RouteVHostID, vhostHandler.DeleteVHost)
 
@@ -189,12 +205,12 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 
 		// IP Groups
 		protected.GET("/ip-groups", ipGroupHandler.ListIPGroups)
-		protected.GET("/ip-groups/:id", ipGroupHandler.GetIPGroup)
+		protected.GET(RouteIPGroupsID, ipGroupHandler.GetIPGroup)
 		protected.POST("/ip-groups", ipGroupHandler.CreateIPGroup)
-		protected.PUT("/ip-groups/:id", ipGroupHandler.UpdateIPGroup)
-		protected.DELETE("/ip-groups/:id", ipGroupHandler.DeleteIPGroup)
-		protected.GET("/ip-groups/:id/addresses", ipGroupHandler.GetIPAddresses)
-		protected.POST("/ip-groups/:id/addresses", ipGroupHandler.AddIPAddress)
+		protected.PUT(RouteIPGroupsID, ipGroupHandler.UpdateIPGroup)
+		protected.DELETE(RouteIPGroupsID, ipGroupHandler.DeleteIPGroup)
+		protected.GET(RouteIPGroupAddress, ipGroupHandler.GetIPAddresses)
+		protected.POST(RouteIPGroupAddress, ipGroupHandler.AddIPAddress)
 		protected.PUT("/ip-groups/:id/addresses/:addressId", ipGroupHandler.UpdateIPAddress)
 		protected.DELETE("/ip-groups/:id/addresses/:addressId", ipGroupHandler.DeleteIPAddress)
 
@@ -202,6 +218,7 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		protected.GET("/certificates", certHandler.GetCertificates)
 		protected.GET(constants.RouteCertificateID, certHandler.GetCertificate)
 		protected.POST("/certificates", certHandler.CreateCertificate)
+		protected.POST("/certificates/generate", certHandler.GenerateCertificate)
 		protected.POST("/certificates/upload", certHandler.UploadCertificate)
 		protected.PUT(constants.RouteCertificateID, certHandler.UpdateCertificate)
 		protected.DELETE(constants.RouteCertificateID, certHandler.DeleteCertificate)
@@ -230,33 +247,96 @@ func setupAPIRoutes(apiV1 *gin.RouterGroup, authService *services.AuthService, a
 		protected.GET("/logs/nginx/stream", logsHandler.StreamNginxLogs)
 		protected.GET("/logs/waf", logsHandler.GetWAFLogs)
 
+		// Dynamic Bans
+		protected.GET("/bans", bansHandler.ListBans)
+		protected.DELETE("/bans/:id", bansHandler.UnbanIP)
+
+		// Notifications
+		protected.GET("/notifications/channels", notificationsHandler.ListChannels)
+		protected.POST("/notifications/channels", notificationsHandler.CreateChannel)
+		protected.GET("/notifications/channels/:id", notificationsHandler.GetChannel)
+		protected.PUT("/notifications/channels/:id", notificationsHandler.UpdateChannel)
+		protected.DELETE("/notifications/channels/:id", notificationsHandler.DeleteChannel)
+		protected.POST("/notifications/test", notificationsHandler.TestNotification)
+
+		// Rules Engine
+		protected.GET("/rules", rulesHandler.GetRules)
+		protected.POST("/rules", rulesHandler.CreateRule)
+		protected.PUT("/rules/:id", rulesHandler.UpdateRule)
+		protected.DELETE("/rules/:id", rulesHandler.DeleteRule)
+		protected.POST("/rules/reorder", rulesHandler.ReorderRules)
+
 		// Settings (POST only, GET is public)
 		protected.POST("/settings/app", settingsHandler.SaveAppSettings)
+
+		// Reports
+		protected.GET("/reports", reportsHandler.GenerateReport)
 	}
 }
 
-func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *services.NginxConfigService,
-	vhostService *services.VHostService, certService *services.CertificateService, authService *services.AuthService, reverseProxyHandler *proxy.ReverseProxy) *http.Server {
+// ServerServices bundles services for the server
+type ServerServices struct {
+	Config              *config.Config
+	DB                  *sqlx.DB
+	NginxConfigService  *services.NginxConfigService
+	VHostService        *services.VHostService
+	CertService         *services.CertificateService
+	AuthService         *services.AuthService
+	DynamicBanService   *services.DynamicBanService
+	ReverseProxyHandler *proxy.ReverseProxy
+	EmailService        *services.EmailService
+	NotificationService *services.NotificationService
+	RuleService         *services.RuleService
+	ReportingService    *services.ReportingService
+}
 
-	// Initialize email service
-	emailService := services.NewEmailService(db)
+const (
+	RouteIPGroupsID     = "/ip-groups/:id"
+	RouteIPGroupAddress = "/ip-groups/:id/addresses"
+)
+
+func setupAdminServer(s *ServerServices) *http.Server {
+
+	// Initialize services
+	acmeService := services.NewACMEService()
+
+	// Use shared email service
+	emailService := s.EmailService
 
 	// Initialize API handlers
-	vhostHandler := api.NewVHostHandler(db, nginxConfigService, vhostService, certService, reverseProxyHandler)
-	ipGroupHandler := api.NewIPGroupHandler(db)
-	dashboardHandler := api.NewDashboardHandler(db)
-	authHandler := api.NewAuthHandler(authService, emailService, cfg, db)
-	certHandler := api.NewCertificateHandler(certService)
-	settingsHandler := api.NewSettingsHandler(db)
-	blockingHandler := api.NewBlockingRuleHandler(db)
-	rateLimitHandler := api.NewRateLimitHandler(db)
-	logsHandler := api.NewLogsHandler(db)
+	vhostHandler := api.NewVHostHandler(s.DB, s.NginxConfigService, s.VHostService, s.CertService, s.ReverseProxyHandler)
+	ipGroupHandler := api.NewIPGroupHandler(s.DB)
+	dashboardHandler := api.NewDashboardHandler(s.DB)
+	authHandler := api.NewAuthHandler(s.AuthService, emailService, s.Config, s.DB)
+	certHandler := api.NewCertificateHandler(s.CertService, acmeService)
+	settingsHandler := api.NewSettingsHandler(s.DB)
+	blockingHandler := api.NewBlockingRuleHandler(s.DB)
+	rateLimitHandler := api.NewRateLimitHandler(s.DB)
+	logsHandler := api.NewLogsHandler(s.DB)
+	trafficFiltersHandler := api.NewTrafficFiltersHandler(s.DB)
+	bansHandler := api.NewBansHandler(s.DB, s.DynamicBanService)
+	notificationsHandler := api.NewNotificationsHandler(s.DB, s.NotificationService)
+	rulesHandler := api.NewRulesHandler(s.RuleService)
+	reportsHandler := api.NewReportsHandler(s.ReportingService)
 
-	// Setup admin API
+	// Setup ACME HTTP-01 Handler
+	// All WAF instances should share the ability to solve challenges if they are behind a load balancer,
+	// but here we assume a single instance handling the challenge or sticky sessions.
+	// For distributed setups, a shared storage (Redis) for the provider would be needed.
 	adminRouter := gin.Default()
 
+	// Handle ACME Challenge
+	adminRouter.GET("/.well-known/acme-challenge/:token", func(c *gin.Context) {
+		token := c.Param("token")
+		if keyAuth, ok := acmeService.GetHTTPProvider().GetKeyAuth(token); ok {
+			c.String(http.StatusOK, keyAuth)
+		} else {
+			c.String(http.StatusNotFound, "Challenge not found")
+		}
+	})
+
 	// Get allowed origins from config
-	allowedOrigins := cfg.GetCORSAllowedOrigins()
+	allowedOrigins := s.Config.GetCORSAllowedOrigins()
 
 	// CORS middleware
 	adminRouter.Use(func(c *gin.Context) {
@@ -296,7 +376,7 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 
 	// API routes
 	apiV1 := adminRouter.Group("/api/v1")
-	setupAPIRoutes(apiV1, authService, authHandler, dashboardHandler, vhostHandler, ipGroupHandler, certHandler, settingsHandler, blockingHandler, rateLimitHandler, logsHandler, cfg)
+	setupAPIRoutes(apiV1, s.AuthService, authHandler, dashboardHandler, vhostHandler, ipGroupHandler, certHandler, settingsHandler, blockingHandler, rateLimitHandler, logsHandler, trafficFiltersHandler, bansHandler, notificationsHandler, rulesHandler, reportsHandler, s.Config)
 
 	// Health check
 	adminRouter.GET("/health", func(c *gin.Context) {
@@ -305,10 +385,10 @@ func setupAdminServer(cfg *config.Config, db *sqlx.DB, nginxConfigService *servi
 
 	// Create server
 	adminServer := &http.Server{
-		Addr:         cfg.GetAdminAddr(),
+		Addr:         s.Config.GetAdminAddr(),
 		Handler:      adminRouter,
-		ReadTimeout:  cfg.Server.ReadTimeout,
-		WriteTimeout: cfg.Server.WriteTimeout,
+		ReadTimeout:  s.Config.Server.ReadTimeout,
+		WriteTimeout: s.Config.Server.WriteTimeout,
 	}
 
 	go func() {
@@ -360,6 +440,19 @@ func main() {
 	// Initialize services
 	vhostService, certService, nginxConfigService, authService := initServices(db)
 
+	// Initialize Notification Dependencies
+	emailService := services.NewEmailService(db)
+	notificationService := services.NewNotificationService(db, emailService)
+
+	// Pass NotificationService to DynamicBanService
+	dynamicBanService := services.NewDynamicBanService(db, redisClient, notificationService)
+
+	// Initialize Rule Service
+	ruleService := services.NewRuleService(db.DB)
+
+	// Initialize Reporting Service
+	reportingService := services.NewReportingService(db)
+
 	// Initialize reverse proxy
 	reverseProxyHandler := proxy.NewReverseProxy(cfg, vhostService)
 
@@ -371,8 +464,23 @@ func main() {
 	}
 
 	// Start servers
-	wafServer := setupWAFServer(cfg, redisClient, db, reverseProxyHandler)
-	adminServer := setupAdminServer(cfg, db, nginxConfigService, vhostService, certService, authService, reverseProxyHandler)
+	wafServer := setupWAFServer(cfg, redisClient, db, reverseProxyHandler, dynamicBanService, notificationService, ruleService)
+
+	serverServices := &ServerServices{
+		Config:              cfg,
+		DB:                  db,
+		NginxConfigService:  nginxConfigService,
+		VHostService:        vhostService,
+		CertService:         certService,
+		AuthService:         authService,
+		DynamicBanService:   dynamicBanService,
+		ReverseProxyHandler: reverseProxyHandler,
+		EmailService:        emailService,
+		NotificationService: notificationService,
+		RuleService:         ruleService,
+		ReportingService:    reportingService,
+	}
+	adminServer := setupAdminServer(serverServices)
 
 	// Wait for shutdown signal
 	gracefulShutdown(wafServer, adminServer)

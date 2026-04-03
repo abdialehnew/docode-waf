@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Shield, LayoutDashboard, Server, Users, Activity, Lock, Settings, LogOut, User, FileText, ChevronDown, ChevronRight } from 'lucide-react'
+import { Shield, LayoutDashboard, Server, Users, Activity, Lock, Settings, LogOut, User, FileText, ChevronDown, ChevronRight, Bell } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useState, useEffect } from 'react'
 import ConfirmModal from './ConfirmModal'
@@ -47,17 +47,27 @@ const Layout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Virtual Hosts', path: '/vhosts', icon: Server },
-    { name: 'IP Groups & Blacklists/Whitelists', path: '/ip-groups', icon: Users },
+    { name: 'IP Groups', path: '/ip-groups', icon: Users },
+    { name: 'Dynamic Bans', path: '/bans', icon: Shield },
     { name: 'Traffic Logs', path: '/traffic', icon: Activity },
-    { name: 'SSL Certificates', path: '/certificates', icon: Lock },
-    { 
-      name: 'Monitoring', 
+    {
+      name: 'Monitoring',
       icon: FileText,
       submenus: [
-        { name: 'Logging', path: '/monitoring' }
+        { name: 'Logging', path: '/monitoring' },
+        { name: 'Reports', path: '/reports' }
       ]
     },
-    { name: 'Settings', path: '/settings', icon: Settings },
+    {
+      name: 'Settings',
+      icon: Settings,
+      submenus: [
+        { name: 'General', path: '/settings' },
+        { name: 'SSL Certificates', path: '/certificates' },
+        { name: 'Rules Engine', path: '/rules' },
+        { name: 'Notifications', path: '/notifications' }
+      ]
+    },
   ]
 
   const handleLogout = () => {
@@ -78,9 +88,9 @@ const Layout = ({ children }) => {
         <div className="p-6 flex-shrink-0">
           <div className="flex items-center gap-2">
             {appSettings.app_logo ? (
-              <img 
-                src={appSettings.app_logo} 
-                alt="Logo" 
+              <img
+                src={appSettings.app_logo}
+                alt="Logo"
                 className="w-8 h-8 object-contain"
               />
             ) : (
@@ -97,20 +107,19 @@ const Layout = ({ children }) => {
               const Icon = item.icon
               const menuKey = item.name.toLowerCase().replace(/\s+/g, '-')
               const isExpanded = expandedMenus[menuKey]
-              
+
               // Item with submenus
               if (item.submenus) {
                 const hasActiveSubmenu = item.submenus.some(sub => location.pathname === sub.path)
-                
+
                 return (
                   <div key={index}>
                     <button
                       onClick={() => toggleMenu(menuKey)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                        hasActiveSubmenu
-                          ? 'bg-gray-800 text-white'
-                          : 'text-gray-300 hover:bg-gray-800'
-                      }`}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${hasActiveSubmenu
+                        ? 'bg-gray-800 text-white'
+                        : 'text-gray-300 hover:bg-gray-800'
+                        }`}
                     >
                       <Icon className="w-5 h-5" />
                       <span className="flex-1 text-left">{item.name}</span>
@@ -124,11 +133,10 @@ const Layout = ({ children }) => {
                             <Link
                               key={submenu.path}
                               to={submenu.path}
-                              className={`block px-4 py-2 rounded-lg text-sm transition-colors ${
-                                isActive
-                                  ? 'bg-primary-600 text-white'
-                                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-300'
-                              }`}
+                              className={`block px-4 py-2 rounded-lg text-sm transition-colors ${isActive
+                                ? 'bg-primary-600 text-white'
+                                : 'text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+                                }`}
                             >
                               {submenu.name}
                             </Link>
@@ -139,18 +147,17 @@ const Layout = ({ children }) => {
                   </div>
                 )
               }
-              
+
               // Regular menu item
               const isActive = location.pathname === item.path
               return (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-primary-600 text-white'
-                      : 'text-gray-300 hover:bg-gray-800'
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-800'
+                    }`}
                 >
                   <Icon className="w-5 h-5" />
                   <span>{item.name}</span>

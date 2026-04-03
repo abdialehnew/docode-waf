@@ -16,6 +16,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Step 0: Git pull
+echo -e "${YELLOW}[0/5] Git pull...${NC}"
+git pull
+echo -e "${GREEN}✓ Git pull${NC}"
+echo ""
+
 # Step 1: Stop containers
 echo -e "${YELLOW}[1/5] Stopping containers...${NC}"
 docker compose stop waf frontend nginx-proxy || true
@@ -26,6 +32,9 @@ echo ""
 echo -e "${YELLOW}[2/5] Removing containers...${NC}"
 docker compose rm -f waf frontend nginx-proxy || true
 echo -e "${GREEN}✓ Containers removed${NC}"
+sudo rm -rf ./data/nginx/cache/*
+sudo rm -rf ./data/nginx/logs/*
+sudo rm -rf ./data/waf/*
 echo ""
 
 # Step 3: Remove old images
@@ -38,8 +47,8 @@ echo ""
 
 # Step 4: Build new images
 echo -e "${YELLOW}[4/5] Building new images...${NC}"
-sudo chmod -R 777 /data/docode/docode-waf/data/nginx/cache/proxy/
-sudo chmod -R 777 /data/docode/docode-waf/data/postgresql/pgdata/
+sudo chmod -R 777 ./data/redis/
+sudo chmod -R 777 ./data/postgresql/pgdata/
 docker compose build --no-cache waf nginx-proxy frontend
 echo -e "${GREEN}✓ Images built successfully${NC}"
 echo ""

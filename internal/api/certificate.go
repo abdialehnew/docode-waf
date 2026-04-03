@@ -10,11 +10,13 @@ import (
 
 type CertificateHandler struct {
 	certService *services.CertificateService
+	acmeService *services.ACMEService
 }
 
-func NewCertificateHandler(certService *services.CertificateService) *CertificateHandler {
+func NewCertificateHandler(certService *services.CertificateService, acmeService *services.ACMEService) *CertificateHandler {
 	return &CertificateHandler{
 		certService: certService,
+		acmeService: acmeService,
 	}
 }
 
@@ -173,6 +175,90 @@ func (h *CertificateHandler) UploadCertificate(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":     "Certificate uploaded successfully",
+		"certificate": certificate,
+	})
+}
+
+// GenerateCertificate handles certificate generation via Let's Encrypt
+func (h *CertificateHandler) GenerateCertificate(c *gin.Context) {
+	var input struct {
+		Domain             string `json:"domain" binding:"required"`
+		Email              string `json:"email" binding:"required,email"`
+		IsWildcard         bool   `json:"is_wildcard"`
+		DNSProvider        string `json:"dns_provider"`
+		CloudflareAPIToken string `json:"cloudflare_api_token"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Prepare credentials map
+	credentials := make(map[string]string)
+	if input.DNSProvider == "cloudflare" {
+		if input.CloudflareAPIToken == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cloudflare API token is required for wildcard certificates"})
+			return
+		}
+
+		// Verify token validity
+		if err := h.acmeService.VerifyCloudflareToken(input.CloudflareAPIToken); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Cloudflare API token: " + err.Error()})
+			return
+		}
+
+		credentials["cloudflare_api_token"] = input.CloudflareAPIToken
+	}
+
+	// Adjust domain for wildcard
+	targetDomain := input.Domain
+	if input.IsWildcard {
+		// Ensure domain starts with *.
+		if len(targetDomain) < 2 || targetDomain[:2] != "*." {
+			targetDomain = "*." + targetDomain
+		}
+		// Wildcard requires DNS-01
+		if input.DNSProvider == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Wildcard certificates require a DNS provider (e.g., Cloudflare)"})
+			return
+		}
+	}
+
+	// Request certificate from Let's Encrypt
+	certs, err := h.acmeService.ObtainCertificate(targetDomain, input.Email, input.DNSProvider, credentials)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate certificate: " + err.Error()})
+		return
+	}
+
+	// Create certificate input for DB
+	certName := targetDomain
+	if input.IsWildcard {
+		certName = "Wildcard " + input.Domain
+	}
+
+	certInput := &models.CertificateInput{
+		Name:        certName,
+		CertContent: string(certs.Certificate),
+		KeyContent:  string(certs.PrivateKey),
+	}
+
+	// Save to DB
+	certificate, err := h.certService.CreateCertificate(certInput)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save generated certificate: " + err.Error()})
+		return
+	}
+
+	// Save files to filesystem
+	if err := h.certService.SaveCertificateFiles(certificate.ID, []byte(certInput.CertContent), []byte(certInput.KeyContent)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save certificate files: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":     "Certificate generated successfully",
 		"certificate": certificate,
 	})
 }

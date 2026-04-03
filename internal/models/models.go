@@ -1,7 +1,10 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // Admin represents an administrator user
@@ -24,6 +27,7 @@ type Admin struct {
 type VHost struct {
 	ID                     string    `json:"id" db:"id"`
 	Name                   string    `json:"name" db:"name"`
+	Type                   string    `json:"type" db:"type"` // proxy, redirect, dead, stream
 	Domain                 string    `json:"domain" db:"domain"`
 	BackendURL             string    `json:"backend_url" db:"backend_url"`
 	Backends               []string  `json:"backends" db:"-"` // Multiple backend URLs for load balancing
@@ -34,22 +38,50 @@ type VHost struct {
 	SSLCertPath            string    `json:"ssl_cert_path,omitempty" db:"ssl_cert_path"`
 	SSLKeyPath             string    `json:"ssl_key_path,omitempty" db:"ssl_key_path"`
 	Enabled                bool      `json:"enabled" db:"enabled"`
-	RegionWhitelist        []string  `json:"region_whitelist" db:"region_whitelist"`
-	RegionBlacklist        []string  `json:"region_blacklist" db:"region_blacklist"`
-	RegionFilteringEnabled bool      `json:"region_filtering_enabled" db:"region_filtering_enabled"`
-	CreatedAt              time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at" db:"updated_at"`
+	RegionWhitelist        pq.StringArray `json:"region_whitelist" db:"region_whitelist"`
+	RegionBlacklist        pq.StringArray `json:"region_blacklist" db:"region_blacklist"`
+	RegionFilteringEnabled bool           `json:"region_filtering_enabled" db:"region_filtering_enabled"`
+	DefenseMode            string         `json:"defense_mode" db:"defense_mode"`
+	MaxUploadSize          int            `json:"max_upload_size" db:"max_upload_size"`
+	ProxyReadTimeout       int            `json:"proxy_read_timeout" db:"proxy_read_timeout"`
+	ProxyConnectTimeout    int            `json:"proxy_connect_timeout" db:"proxy_connect_timeout"`
+	BotDetectionEnabled    bool           `json:"bot_detection_enabled" db:"bot_detection_enabled"`
+	BotDetectionType       string         `json:"bot_detection_type" db:"bot_detection_type"`
+	RecaptchaVersion       string         `json:"recaptcha_version" db:"recaptcha_version"`
+	RateLimitEnabled       bool           `json:"rate_limit_enabled" db:"rate_limit_enabled"`
+	RateLimitRequests      int            `json:"rate_limit_requests" db:"rate_limit_requests"`
+	RateLimitWindow        int            `json:"rate_limit_window" db:"rate_limit_window"`
+	CacheEnabled           bool           `json:"cache_enabled" db:"cache_enabled"`
+	CacheTTL               int            `json:"cache_ttl" db:"cache_ttl"`
+	CacheMethods           pq.StringArray `json:"cache_methods" db:"cache_methods"`
+	CacheIgnoreHeaders     bool           `json:"cache_ignore_headers" db:"cache_ignore_headers"`
+	HSTSEnabled            bool            `json:"hsts_enabled" db:"hsts_enabled"`
+	HSTSMaxAge             int             `json:"hsts_max_age" db:"hsts_max_age"`
+	HSTSIncludeSubdomains  bool            `json:"hsts_include_subdomains" db:"hsts_include_subdomains"`
+	HSTSPreload            bool            `json:"hsts_preload" db:"hsts_preload"`
+	BrotliEnabled          bool            `json:"brotli_enabled" db:"brotli_enabled"`
+	HTTP3Enabled           bool            `json:"http3_enabled" db:"http3_enabled"`
+	HideServerTokens       bool            `json:"hide_server_tokens" db:"hide_server_tokens"`
+	SecurityHeadersEnabled bool            `json:"security_headers_enabled" db:"security_headers_enabled"`
+	WebsocketEnabled       bool            `json:"websocket_enabled" db:"websocket_enabled"`
+	HTTPVersion            string          `json:"http_version" db:"http_version"`
+	TLSVersion             string          `json:"tls_version" db:"tls_version"`
+	CustomHeaders          json.RawMessage `json:"custom_headers" db:"custom_headers"`
+	CreatedAt              time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt              time.Time       `json:"updated_at" db:"updated_at"`
 }
 
 // VHostLocation represents a specific path location within a vhost
 type VHostLocation struct {
-	ID         string    `json:"id" db:"id"`
-	VHostID    string    `json:"vhost_id" db:"vhost_id"`
-	Path       string    `json:"path" db:"path"`
-	BackendURL string    `json:"backend_url" db:"backend_url"`
-	Enabled    bool      `json:"enabled" db:"enabled"`
-	CreatedAt  time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
+	ID                string   `json:"id" db:"id"`
+	VHostID           string   `json:"vhost_id" db:"vhost_id"`
+	Path              string   `json:"path" db:"path"`
+	BackendURL        string   `json:"backend_url" db:"backend_url"`
+	Backends          []string `json:"backends" db:"-"` // Multiple backend URLs for load balancing
+	LoadBalanceMethod string   `json:"load_balance_method" db:"load_balance_method"`
+	Enabled           bool     `json:"enabled" db:"enabled"`
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // IPGroup represents a group of IP addresses

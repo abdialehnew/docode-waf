@@ -58,10 +58,20 @@ This project is committed to maintaining high security and code quality standard
   - **Whitelist Mode** - Allow ONLY specified countries (e.g., US, GB, ID)
   - **Blacklist Mode** - Block specific countries (e.g., CN, RU, KP)
   - **ISO 3166-1 Alpha-2** - Standard country codes (2-letter)
-  - **ip-api.com Integration** - Free GeoIP lookup (45 requests/minute)
-  - **Custom Blocked Page** - Beautiful gradient page with country info
+  - **MaxMind GeoLite2** - Offline database for high performance and privacy
+  - **Dynamic Nginx Module** - Compiled `ngx_http_geoip2_module` for real-time lookups
+- ✅ **Custom Error Pages** - Modern "Akses Terbatas" (Access Restricted) page for 403 errors:
+  - **Indonesian Language** - Clear and informative Indonesian text
+  - **Dynamic Data** - Shows visitor IP and requested domain using Nginx `sub_filter`
+  - **Premium Design** - High-quality aesthetic matching the WAF brand
 - ✅ **URL Filtering** - Pattern-based URL blocking
-- ✅ **SSL Certificate Management** - Upload and manage SSL certificates per domain
+- ✅ **SSL Certificate Management** - Upload, **generate (Let's Encrypt)**, and manage SSL certificates per domain
+  - **Wildcard Support** - Generate `*.example.com` certificates using Cloudflare DNS-01 challenge
+- ✅ **Advanced VHost Types** - Support for multiple host types:
+  - **Proxy Host** - Standard reverse proxy (default)
+  - **Redirect Host** - HTTP 301/302 redirects to target URL
+  - **Dead Host** - Return 404 Not Found
+- ✅ **Multiple Domains** - Support for multiple domain names per Virtual Host (space-separated)
 - ✅ **HTTP Flood Protection** - Protect against DDoS and HTTP flood attacks
 - ✅ **Bot Detection (Per-VHost)** - Advanced bot detection with multiple challenge types:
   - **Cloudflare Turnstile** - Modern CAPTCHA with Force Interactive mode
@@ -70,6 +80,10 @@ This project is committed to maintaining high security and code quality standard
   - **Slide Puzzle** - Custom puzzle challenge
 - ✅ **Rate Limiter (Per-VHost)** - Configurable request limits with beautiful countdown page
 - ✅ **Application Branding** - Custom app name and logo configuration
+- ✅ **Dynamic IP Banning** - Automatically ban IPs that trigger multiple security violations (Fail2Ban style)
+  - Configurable threshold (e.g., 10 violations in 1 minute)
+  - Temporary bans with configurable duration
+  - Manual unban via dashboard
 
 ### Attack Detection
 - 🔍 **SQL Injection** - Pattern matching for SQL injection attempts
@@ -91,11 +105,15 @@ This project is committed to maintaining high security and code quality standard
 - 🛡️ **Per-VHost Bot Detection** - Enable/disable and configure bot challenges per domain
 - ⏱️ **Per-VHost Rate Limiting** - Set custom rate limits (requests/window) per domain
 - 🎨 **Application Settings** - Configure app name, logo, and branding
-- 📝 **Nginx Config Editor** - Edit vhost configs with syntax highlighting (Monokai theme)
+- 📝 **Bidirectional Config Editor** - Form & Code Editor in sync with Nginx syntax highlighting
 - 🔄 **Auto-Backup** - Automatic backup before config changes
-- 📍 **Custom Locations** - Define custom location blocks per vhost
+- 📍 **Custom Locations** - Advanced routing with load balancing per location
 - 🏷️ **Custom Headers** - Add custom HTTP headers per vhost
 - 🗑️ **Auto Cleanup** - Delete log files when vhost is removed
+- 🔔 **Notification System** - Real-time alerts for security events
+  - Support for **Slack**, **Discord**, **Email**, and **Generic Webhooks**
+  - Instant alerts for high-severity attacks (SQLi, Admin Scan) and IP bans
+  - Configurable via "Notification Channels" UI
 
 ### Monitoring & Logging
 - 📋 **Centralized Logging** - Unified interface for all system logs
@@ -162,10 +180,15 @@ docode-waf/
 │   │   │   └── api.js          # API client
 │   │   └── App.jsx
 │   └── package.json
-├── migrations/                  # Database migrations
+├── nginx/                       # Nginx Proxy configuration
+│   ├── html/                    # Custom static assets (error pages)
+│   │   └── access-restricted.html # Premium 403 Access Restricted page
+│   ├── Dockerfile               # Custom Nginx build with Brotli & GeoIP2
+│   ├── nginx.conf               # Global Nginx configuration
+│   └── entrypoint.sh            # Dynamic module & config setup
+├── migrations/                  # Database migrations (PostgreSQL)
 ├── docker-compose.yaml          # Docker orchestration
-├── Dockerfile                   # WAF backend container
-├── GeoLite2-Country.mmdb       # GeoIP database
+├── GeoLite2-Country.mmdb       # GeoIP database (MaxMind)
 └── config.yaml                  # Configuration file
 ```
 
@@ -179,8 +202,9 @@ docode-waf/
 - **Database**: PostgreSQL 15
 - **Cache**: Redis 7.4
 - **Authentication**: JWT
-- **Proxy**: Nginx
-- **GeoIP**: MaxMind GeoLite2
+- **Proxy**: Nginx (Custom build)
+- **GeoIP**: MaxMind GeoLite2 (via `ngx_http_geoip2_module`)
+- **ACME**: go-acme/lego (Let's Encrypt)
 
 ### Frontend
 - **Framework**: React 18
@@ -193,6 +217,7 @@ docode-waf/
 - **CAPTCHA**: Cloudflare Turnstile
 - **Code Editor**: CodeMirror (@uiw/react-codemirror)
 - **Syntax Highlighting**: Custom Nginx language mode
+- **Alerts/Dialogs**: SweetAlert2
 
 ### DevOps
 - **Containerization**: Docker & Docker Compose
@@ -377,7 +402,9 @@ Confirm new password:
 3. Fill in details:
    - **Name**: Friendly name (e.g., "My API Server")
    - **Domain**: example.com
-   - **Backend URL**: http://backend:9101
+   - **Backend Servers**: 
+     - Enter primary backend URL (e.g., `http://backend:8080`)
+     - Click **"Add Backend Server"** for load balancing (Round Robin, Least Conn, IP Hash)
    - **Enable SSL**: Toggle on
    - **SSL Certificate**: Select from dropdown
    - **Advanced Settings**:
@@ -387,14 +414,16 @@ Confirm new password:
      - Max upload size (MB)
      - Proxy timeouts
      - Custom Headers (JSON object)
-     - Custom Location Blocks (path, proxy_pass, custom config)
+     - Custom Location Blocks (path, proxy_pass, load balancing, custom config)
 4. Click **"Save"**
 
 ### Edit Nginx Config
 
 1. Navigate to **Virtual Hosts** page
-2. Click the **File Code icon** (📄) on any vhost
-3. Edit config with:
+2. Click **Edit** (✏️) on any vhost
+3. Switch to **"Config Editor"** tab
+4. **Bidirectional Sync**: Changes in the Form tab automatically update the Config Editor, and manual edits in the Editor are parsed back to update the Form!
+5. Edit config with:
    - **Syntax Highlighting**: Nginx keywords, strings, comments
    - **Monokai Theme**: Sublime Text style colors
    - **Line Numbers**: Easy navigation
@@ -459,6 +488,55 @@ server {
     }
 }
 ```
+
+---
+
+## 🔐 SSL Management
+
+### Generate with Let's Encrypt
+
+DCode WAF integrates with **Let's Encrypt** to provide free, automated SSL certificates.
+
+**Prerequisites:**
+1.  **Public Access**: The domain **must** point to this server's public IP.
+2.  **Port 80**: Port 80 must be accessible from the internet (for HTTP-01 challenge).
+
+**Steps:**
+1.  Navigate to **SSL Certificates** page.
+2.  Click **"Generate SSL"**.
+3.  Enter:
+    - **Domain Name**: e.g., `example.com`
+    - **Email Address**: For expiry notifications (required by Let's Encrypt).
+4.  **Wildcard Support (Optional)**:
+    - Check **"Wildcard Certificate"** to generate `*.example.com`.
+    - Requires **Cloudflare API Token** with `Zone:DNS:Edit` permission (system handles DNS-01 challenge).
+5.  Click **"Generate Certificate"**.
+6.  Once successful, the certificate will appear in the list and can be assigned to a Virtual Host.
+
+### Advanced VHost Configuration
+
+**New in v0.01-beta**:
+
+-   **Multiple Domains**: Enter multiple domains separated by spaces (e.g., `example.com www.example.com`).
+-   **Multiple Backends**:
+    -   Add multiple backend servers for load balancing.
+    -   **Load Balancing Methods**: Round Robin, Least Connections, IP Hash.
+-   **VHost Types**:
+    -   **Proxy**: Forwards traffic to a backend service.
+    -   **Redirect**: Redirects all traffic to a specified URL (e.g., redirect `example.com` to `https://newsite.com`).
+    -   **Dead**: Returns a 404 Not Found error for the domain.
+
+### Upload Custom Certificate
+
+If you have your own certificate (e.g., from Cloudflare, ZeroSSL, or specific CA):
+
+1.  Navigate to **SSL Certificates** page.
+2.  Click **"Upload Certificate"**.
+3.  Provide:
+    - **Name**: Friendly identifier.
+    - **Certificate File**: `.crt`, `.pem`, or `.cer`.
+    - **Private Key File**: `.key` or `.pem`.
+4.  Click **"Upload"**.
 
 ---
 
@@ -675,6 +753,26 @@ migrate -path migrations -database "postgresql://user:pass@localhost:5432/dbname
 migrate -path migrations -database "postgresql://user:pass@localhost:5432/dbname" down
 ```
 
+### Attack Simulator
+
+Verify WAF protection with the included attack simulator:
+
+```bash
+# Make script executable
+chmod +x attack_simulator.sh
+
+# Run simulation (targets localhost:8080 by default)
+./attack_simulator.sh
+```
+
+**What it tests:**
+- 🛡️ **SQL Injection** detection
+- 🛡️ **XSS** and **Path Traversal** blocking
+- 🛡️ **Bot Detection** (User-Agent checks)
+- 🛡️ **Rate Limiting** triggers
+- 🛡️ **Dynamic IP Banning** (sends rapid attacks to trigger auto-ban)
+- 🔔 **Notification Triggers**
+
 ---
 
 ## 📝 API Endpoints
@@ -715,6 +813,7 @@ POST   /api/v1/settings/app     # Update app settings
 ```
 GET    /api/v1/certificates     # List certificates
 POST   /api/v1/certificates     # Upload certificate
+POST   /api/v1/certificates/generate # Generate Let's Encrypt certificate
 DELETE /api/v1/certificates/:id # Delete certificate
 ```
 
