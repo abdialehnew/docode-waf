@@ -67,6 +67,7 @@ type VHostWithLocations struct {
 	RateLimitRate        string // Calculated rate (e.g., 10r/s)
 	RateLimitBurst       int    // Burst value for limit_req
 	GeoIPAvailable       bool   // True if MaxMind database exists
+	AppName              string // Application name from settings
 }
 
 type IPRule struct {
@@ -213,6 +214,8 @@ server {
         internal;
         sub_filter '{{ "{{" }}IP_ADDRESS{{ "}}" }}' '$remote_addr';
         sub_filter '{{ "{{" }}DOMAIN_NAME{{ "}}" }}' '$host';
+        sub_filter 'DoCode WAF' '{{.AppName}}';
+        sub_filter 'Docode WAF' '{{.AppName}}';
         sub_filter_once on;
     }
     
@@ -410,6 +413,17 @@ func (s *NginxConfigService) GenerateVHostConfig(vhost *models.VHost) error {
 				}
 			}
 		}
+
+		// Fetch App Name for sub_filter
+		var appName string
+		err := s.db.Get(&appName, "SELECT app_name FROM app_settings WHERE id = 1")
+		if err == nil && appName != "" {
+			vhostWithLocs.AppName = appName
+		} else {
+			vhostWithLocs.AppName = "Docode WAF"
+		}
+	} else {
+		vhostWithLocs.AppName = "Docode WAF"
 	}
 
 	content, err := s.GenerateVHostConfigContent(vhostWithLocs)

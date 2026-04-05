@@ -12,7 +12,7 @@ const Layout = ({ children }) => {
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null })
   const [expandedMenus, setExpandedMenus] = useState({})
   const [appSettings, setAppSettings] = useState({
-    app_name: 'Docode WAF',
+    app_name: '',
     app_logo: null
   })
 

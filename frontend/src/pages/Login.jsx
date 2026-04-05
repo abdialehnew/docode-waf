@@ -17,7 +17,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [appSettings, setAppSettings] = useState({
-    app_name: 'Docode WAF',
+    app_name: '',
     app_logo: '',
     signup_enabled: true
   });
@@ -212,8 +212,7 @@ const Login = () => {
 
         {/* Footer */}
         <div className="mt-8 text-center text-gray-500 text-sm">
-          {/* <p>&copy; 2025 {appSettings.app_name}. All rights reserved.</p> */}
-          <p>&copy; 2025 Do Code Indonesia. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} {appSettings.app_name || 'WAF'}. All rights reserved.</p>
         </div>
       </div>
     </div>
