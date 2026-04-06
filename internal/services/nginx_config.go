@@ -301,7 +301,7 @@ server {
 {{range .CustomLocations}}
     # Custom Location: {{.Path}}
     location {{.Path}} {
-        rewrite ^{{.Path}}/(.*) /$1 break;
+        rewrite ^{{.Path}}/?(.*) /$1 break;
         {{if .HasUpstream}}proxy_pass http://{{.UpstreamName}}_backend;
         {{else if .ProxyPass}}proxy_pass {{.ProxyPass}};
         {{end}}{{if or .HasUpstream .ProxyPass}}proxy_set_header Host $host;

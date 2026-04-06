@@ -37,7 +37,7 @@ func TestGenerateVHostConfigCustomLocationRewrite(t *testing.T) {
 		t.Fatalf("Failed to generate config: %v", err)
 	}
 
-	expectedRewrite := "rewrite ^/custom/(.*) /$1 break;"
+	expectedRewrite := "rewrite ^/custom/?(.*) /$1 break;"
 	if !strings.Contains(content, expectedRewrite) {
 		t.Errorf("Expected config to contain rewrite rule %q, but got:\n%s", expectedRewrite, content)
 	}

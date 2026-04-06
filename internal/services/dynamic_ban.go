@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
+	"net"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -43,6 +45,16 @@ func NewDynamicBanService(db *sqlx.DB, redisClient *redis.Client, notificationSe
 // RecordViolation increments the violation count for an IP
 // If count exceeds threshold, bans the IP
 func (s *DynamicBanService) RecordViolation(ip string, violationType string) error {
+	// Skip if IP is whitelisted
+	whitelisted, err := s.IsWhitelisted(ip)
+	if err == nil && whitelisted {
+		log.Printf("[DynamicBan] IP %s is whitelisted, skipping violation recording", ip)
+		return nil
+	}
+	if err != nil {
+		log.Printf("[DynamicBan] Error checking whitelist for IP %s: %v", ip, err)
+	}
+
 	ctx := context.Background()
 	key := violationKeyPrefix + ip
 
@@ -133,6 +145,55 @@ func (s *DynamicBanService) IsBanned(ip string) (bool, string) {
 	// Let's rely on Redis for high performance, DB for history/audit
 
 	return false, ""
+}
+
+// IsWhitelisted checks if an IP is in any whitelist group
+func (s *DynamicBanService) IsWhitelisted(ip string) (bool, error) {
+	if s.db == nil {
+		return false, nil
+	}
+
+	// Query all addresses in whitelist groups
+	// This includes global and vhost-specific whitelists
+	query := `
+		SELECT ia.ip_address, ia.cidr_mask 
+		FROM ip_addresses ia
+		JOIN ip_groups ig ON ia.group_id = ig.id
+		WHERE ig.type = 'whitelist'
+	`
+
+	var addresses []struct {
+		IPAddress string `db:"ip_address"`
+		CIDRMask  *int   `db:"cidr_mask"`
+	}
+
+	err := s.db.Select(&addresses, query)
+	if err != nil {
+		return false, err
+	}
+
+	clientIPParsed := net.ParseIP(ip)
+	if clientIPParsed == nil {
+		return false, fmt.Errorf("invalid IP: %s", ip)
+	}
+
+	for _, addr := range addresses {
+		if addr.CIDRMask != nil && *addr.CIDRMask > 0 {
+			// CIDR match
+			cidr := fmt.Sprintf("%s/%d", addr.IPAddress, *addr.CIDRMask)
+			_, ipNet, err := net.ParseCIDR(cidr)
+			if err == nil && ipNet.Contains(clientIPParsed) {
+				return true, nil
+			}
+		} else {
+			// Exact match
+			if addr.IPAddress == ip {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 // UnbanIP removes a ban
