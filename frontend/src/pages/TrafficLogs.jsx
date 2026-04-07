@@ -87,9 +87,10 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, disable
               return (
                 <span key={val} className="bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded flex items-center gap-1">
                   {opt?.flag} {opt?.label || val}
+                  {opt?.count !== undefined && <span className="opacity-60 ml-0.5">({opt.count})</span>}
                   <button 
                     type="button"
-                    className="cursor-pointer hover:text-red-600 p-0 bg-transparent border-0"
+                    className="cursor-pointer hover:text-red-600 p-0 bg-transparent border-0 ml-1"
                     onClick={(e) => removeSelected(val, e)}
                     aria-label={`Remove ${opt?.label || val}`}
                   >
