@@ -46,6 +46,9 @@ func (h *TrafficFiltersHandler) GetUniqueCountries(c *gin.Context) {
 // GetUniqueIPs returns unique IPs from traffic logs, optionally filtered by country
 func (h *TrafficFiltersHandler) GetUniqueIPs(c *gin.Context) {
 	countryCodes := c.QueryArray("country_code")
+	if len(countryCodes) == 0 {
+		countryCodes = c.QueryArray("country_code[]")
+	}
 
 	var ips []struct {
 		ClientIP    string `db:"client_ip" json:"client_ip"`

@@ -43,8 +43,11 @@ export const getTrafficLogs = (limit = 100, offset = 0) =>
   api.get('/dashboard/traffic', { params: { limit, offset } })
 
 export const getTrafficCountries = () => api.get('/traffic/countries')
-export const getTrafficIPs = (countryCodes = []) =>
-  api.get('/traffic/ips', { params: { country_code: countryCodes } })
+export const getTrafficIPs = (countryCodes = []) => {
+  const params = new URLSearchParams()
+  countryCodes.forEach(code => params.append('country_code', code))
+  return api.get('/traffic/ips', { params })
+}
 
 export const getAttacksByCountry = (params = {}) =>
   api.get('/dashboard/attacks-by-country', { params })
