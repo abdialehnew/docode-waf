@@ -48,6 +48,12 @@ func IPBlockerMiddleware(db *sqlx.DB) gin.HandlerFunc {
 			domain = domain[:colonIdx]
 		}
 
+		// Skip for internal traffic/localhost
+		if domain == "127.0.0.1" || domain == "localhost" || strings.HasPrefix(domain, "172.") {
+			c.Next()
+			return
+		}
+
 		// Debug logging
 		log.Printf("[IP Blocker] Client IP: %s, Domain: %s, X-Forwarded-For: %s, X-Real-IP: %s, RemoteAddr: %s",
 			clientIP, domain, xForwardedFor, xRealIP, c.Request.RemoteAddr)

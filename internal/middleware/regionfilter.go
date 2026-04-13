@@ -10,6 +10,7 @@ import (
 	"github.com/aleh/docode-waf/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // RegionFilter middleware checks if request is from allowed/blocked region
@@ -17,11 +18,17 @@ func RegionFilter(db *sqlx.DB, geoIPService *services.GeoIPService) gin.HandlerF
 	return func(c *gin.Context) {
 		domain := c.Request.Host
 
+		// Skip for internal traffic/localhost
+		if domain == "127.0.0.1" || domain == "localhost" || strings.HasPrefix(domain, "172.") {
+			c.Next()
+			return
+		}
+
 		// Get vhost settings
 		var vhostSettings struct {
-			RegionWhitelist        []string `db:"region_whitelist"`
-			RegionBlacklist        []string `db:"region_blacklist"`
-			RegionFilteringEnabled bool     `db:"region_filtering_enabled"`
+			RegionWhitelist        pq.StringArray `db:"region_whitelist"`
+			RegionBlacklist        pq.StringArray `db:"region_blacklist"`
+			RegionFilteringEnabled bool           `db:"region_filtering_enabled"`
 		}
 
 		query := `

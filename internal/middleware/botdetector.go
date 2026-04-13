@@ -34,6 +34,12 @@ func BotDetectorMiddleware(db *sqlx.DB) gin.HandlerFunc {
 			domain = domain[:colonIdx]
 		}
 
+		// Skip for internal traffic/localhost
+		if domain == "127.0.0.1" || domain == "localhost" || strings.HasPrefix(domain, "172.") {
+			c.Next()
+			return
+		}
+
 		// Check if bot detection is enabled for this vhost
 		var vhostSettings struct {
 			BotDetectionEnabled bool   `db:"bot_detection_enabled"`
