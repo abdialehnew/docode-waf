@@ -694,6 +694,6 @@ ADD COLUMN IF NOT EXISTS hide_server_tokens BOOLEAN DEFAULT true;
 
 -- Source: 019_add_client_body_buffer_size.sql
 -- Migration: Add client_body_buffer_size to vhosts table
-ALTER TABLE vhosts ADD COLUMN IF NOT EXISTS client_body_buffer_size INT DEFAULT 128;
+ALTER TABLE vhosts ADD COLUMN IF NOT EXISTS client_body_buffer_size INT DEFAULT 1024;
 COMMENT ON COLUMN vhosts.client_body_buffer_size IS 'Nginx client_body_buffer_size in KB';
 

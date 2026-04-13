@@ -466,7 +466,7 @@ func (s *NginxConfigService) prepareVHostWithLocations(vhost *models.VHost) *VHo
 
 	// Set default ClientBodyBufferSize if not provided
 	if vhost.ClientBodyBufferSize <= 0 {
-		vhost.ClientBodyBufferSize = 128
+		vhost.ClientBodyBufferSize = 1024
 	}
 
 	return &VHostWithLocations{
