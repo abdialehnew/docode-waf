@@ -44,4 +44,5 @@ type VHostInput struct {
 	HTTP3Enabled           bool                     `json:"http3_enabled"`
 	HideServerTokens       bool                     `json:"hide_server_tokens"`
 	SecurityHeadersEnabled bool                     `json:"security_headers_enabled"`
+	ClientBodyBufferSize   int                      `json:"client_body_buffer_size"`
 }

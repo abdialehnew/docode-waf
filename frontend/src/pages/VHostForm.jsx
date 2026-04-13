@@ -51,6 +51,7 @@ const initialFormData = {
     http3_enabled: false,
     hide_server_tokens: true,
     security_headers_enabled: true,
+    client_body_buffer_size: 128,
 }
 
 const VHostForm = () => {
@@ -172,6 +173,7 @@ const VHostForm = () => {
                 http3_enabled: vhost.http3_enabled || false,
                 hide_server_tokens: vhost.hide_server_tokens === undefined ? true : vhost.hide_server_tokens,
                 security_headers_enabled: vhost.security_headers_enabled === undefined ? true : vhost.security_headers_enabled,
+                client_body_buffer_size: vhost.client_body_buffer_size || 128,
             })
             // Save domain for config editor
             if (vhost.domain) {
@@ -701,6 +703,14 @@ const VHostForm = () => {
                                     <input id="max_upload_size" type="number" className="input" min="1" max="1024" value={formData.max_upload_size}
                                         onChange={(e) => setFormData({ ...formData, max_upload_size: Number.parseInt(e.target.value) || 10 })} />
                                     <p className="text-xs text-gray-500 mt-1">Maximum file upload size (client_max_body_size)</p>
+                                </div>
+                                
+                                {/* Client Body Buffer Size */}
+                                <div>
+                                    <label htmlFor="client_body_buffer_size" className="label">Client Body Buffer Size (KB)</label>
+                                    <input id="client_body_buffer_size" type="number" className="input" min="8" max="10240" value={formData.client_body_buffer_size}
+                                        onChange={(e) => setFormData({ ...formData, client_body_buffer_size: Number.parseInt(e.target.value) || 128 })} />
+                                    <p className="text-xs text-gray-500 mt-1">Buffer size for request body. Set higher (e.g., 1024 KB = 1MB) for large file uploads to avoid disk buffering.</p>
                                 </div>
 
                                 {/* Proxy Timeouts */}

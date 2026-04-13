@@ -63,6 +63,7 @@ type VHost struct {
 	HTTP3Enabled           bool            `json:"http3_enabled" db:"http3_enabled"`
 	HideServerTokens       bool            `json:"hide_server_tokens" db:"hide_server_tokens"`
 	SecurityHeadersEnabled bool            `json:"security_headers_enabled" db:"security_headers_enabled"`
+	ClientBodyBufferSize   int             `json:"client_body_buffer_size" db:"client_body_buffer_size"`
 	WebsocketEnabled       bool            `json:"websocket_enabled" db:"websocket_enabled"`
 	HTTPVersion            string          `json:"http_version" db:"http_version"`
 	TLSVersion             string          `json:"tls_version" db:"tls_version"`

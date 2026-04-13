@@ -239,6 +239,7 @@ server {
     
     # Per-VHost Upload Size Limit
     client_max_body_size {{.MaxUploadSize}}m;
+    client_body_buffer_size {{.ClientBodyBufferSize}}k;
     
     # Static Assets Caching (Performance Optimization)
     location ~* \.(jpg|jpeg|png|gif|ico|svg|webp|avif)$ {
@@ -461,6 +462,11 @@ func (s *NginxConfigService) prepareVHostWithLocations(vhost *models.VHost) *VHo
 		geoIPAvailable = true
 	} else if _, err := os.Stat("./data/nginx/geoip/GeoLite2-Country.mmdb"); err == nil {
 		geoIPAvailable = true
+	}
+
+	// Set default ClientBodyBufferSize if not provided
+	if vhost.ClientBodyBufferSize <= 0 {
+		vhost.ClientBodyBufferSize = 128
 	}
 
 	return &VHostWithLocations{
