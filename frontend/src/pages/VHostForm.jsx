@@ -708,9 +708,9 @@ const VHostForm = () => {
                                 {/* Client Body Buffer Size */}
                                 <div>
                                     <label htmlFor="client_body_buffer_size" className="label">Client Body Buffer Size (KB)</label>
-                                    <input id="client_body_buffer_size" type="number" className="input" min="8" max="10240" value={formData.client_body_buffer_size}
-                                        onChange={(e) => setFormData({ ...formData, client_body_buffer_size: Number.parseInt(e.target.value) || 128 })} />
-                                    <p className="text-xs text-gray-500 mt-1">Buffer size for request body. Set higher (e.g., 1024 KB = 1MB) for large file uploads to avoid disk buffering.</p>
+                                    <input id="client_body_buffer_size" type="number" className="input" min="8" max="102400" value={formData.client_body_buffer_size}
+                                        onChange={(e) => setFormData({ ...formData, client_body_buffer_size: Number.parseInt(e.target.value) || 1024 })} />
+                                    <p className="text-xs text-gray-500 mt-1">Buffer size for request body. Set higher (e.g., 20480 KB = 20MB) for large multi-file uploads to avoid disk buffering.</p>
                                 </div>
 
                                 {/* Proxy Timeouts */}
